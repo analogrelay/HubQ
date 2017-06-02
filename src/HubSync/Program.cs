@@ -20,30 +20,33 @@ namespace HubSync
             app.FullName = "HubSync - GitHub Issue Synchronizer";
             app.VersionOption("-v|--version", Version);
 
-            // GitHub connection information
-            var userNameOption = app.Option("-u|--username <USERNAME>", "The GitHub username to use to authenticate", CommandOptionType.SingleValue);
-            var tokenOption = app.Option("-t|--token <TOKEN>", "The GitHub OAuth Token to use to authenticate", CommandOptionType.SingleValue);
-
-            // Destination connection information
-            var sqlConnectionStringOption = app.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server to sync issues to", CommandOptionType.SingleValue);
-
-            // Repositories to sync
-            var repositoryArgument = app.Argument("<REPOSITORIES...>", "Repositories to sync, in the form [owner]/[repo]", multipleValues: true);
-
-            // Logging options
-            var verboseOption = app.Option("-v|--verbose", "Be verbose", CommandOptionType.NoValue);
-
-            app.OnExecute(() =>
+            app.Command("sync", cmd =>
             {
-                // Validate arguments
-                var command = new HubSyncCommand(
-                    userName: GetRequiredOption(userNameOption),
-                    token: GetRequiredOption(tokenOption),
-                    sqlConnectionString: GetRequiredOption(sqlConnectionStringOption),
-                    repositories: repositoryArgument.Values,
-                    loggerFactory: CreateLogger(verboseOption.HasValue()));
+                // GitHub connection information
+                var userNameOption = cmd.Option("-u|--username <USERNAME>", "The GitHub username to use to authenticate", CommandOptionType.SingleValue);
+                var tokenOption = cmd.Option("-t|--token <TOKEN>", "The GitHub OAuth Token to use to authenticate", CommandOptionType.SingleValue);
 
-                return command.ExecuteAsync();
+                // Destination connection information
+                var sqlConnectionStringOption = cmd.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server to sync issues to", CommandOptionType.SingleValue);
+
+                // Repositories to sync
+                var repositoryArgument = cmd.Argument("<REPOSITORIES...>", "Repositories to sync, in the form [owner]/[repo]", multipleValues: true);
+
+                // Logging options
+                var verboseOption = cmd.Option("-v|--verbose", "Be verbose", CommandOptionType.NoValue);
+
+                cmd.OnExecute(() =>
+                {
+                    // Validate arguments
+                    var command = new SyncCommand(
+                            userName: GetRequiredOption(userNameOption),
+                            token: GetRequiredOption(tokenOption),
+                            sqlConnectionString: GetRequiredOption(sqlConnectionStringOption),
+                            repositories: repositoryArgument.Values,
+                            loggerFactory: CreateLogger(verboseOption.HasValue()));
+
+                    return command.ExecuteAsync();
+                });
             });
 
             try
