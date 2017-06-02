@@ -20,7 +20,6 @@ namespace HubSync
         private static object _consoleLock = new object();
 
         private readonly string _categoryName;
-        private readonly ConsoleColor? DefaultConsoleColor = null;
 
         public CliConsoleLogger(string categoryName)
         {
@@ -44,7 +43,7 @@ namespace HubSync
 
             lock (_consoleLock)
             {
-                var (prefix, bg, fg) = GetLogLevelInfo(logLevel);
+                var (prefix, fg, bg) = GetLogLevelInfo(logLevel);
 
                 var oldFg = Console.ForegroundColor;
                 var oldBg = Console.BackgroundColor;
@@ -60,7 +59,7 @@ namespace HubSync
             }
         }
 
-        private (string prefix, ConsoleColor background, ConsoleColor foreground) GetLogLevelInfo(LogLevel logLevel)
+        private (string prefix, ConsoleColor foreground, ConsoleColor background) GetLogLevelInfo(LogLevel logLevel)
         {
             // We must explicitly set the background color if we are setting the foreground color,
             // since just setting one can look bad on the users console.

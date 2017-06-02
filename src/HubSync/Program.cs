@@ -69,7 +69,7 @@ namespace HubSync
             factory.AddProvider("Console", new CliConsoleLoggerProvider());
             if (!verbose)
             {
-                factory.AddFilter((_, _, level) => level >= LogLevel.Information);
+                factory.AddFilter((_, __, level) => level >= LogLevel.Information);
             }
             return factory;
         }
