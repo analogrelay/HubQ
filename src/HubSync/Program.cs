@@ -32,18 +32,15 @@ namespace HubSync
             app.OnExecute(() =>
             {
                 // Validate arguments
-                var userName = GetRequiredOption(userNameOption);
-                var token = GetRequiredOption(tokenOption);
-                var sqlConnectionString = GetRequiredOption(sqlConnectionStringOption);
+                var command = new HubSyncCommand(
+                    userName: GetRequiredOption(userNameOption),
+                    token: GetRequiredOption(tokenOption),
+                    sqlConnectionString: GetRequiredOption(sqlConnectionStringOption),
+                    repositories: repositoryArgument.Values,
+                    stdout: Console.Out,
+                    stderr: Console.Error);
 
-                var repositories = repositoryArgument.Values;
-
-                if (repositories.Count == 0)
-                {
-                    throw new CommandLineException("At least one repository must be specified");
-                }
-
-                return ExecuteAsync(userName, token, sqlConnectionString, repositories);
+                return command.ExecuteAsync();
             });
 
             try
@@ -61,11 +58,6 @@ namespace HubSync
                 Console.WriteLine($": {clex.Message}");
                 return 1;
             }
-        }
-
-        private static Task<int> ExecuteAsync(string userName, string token, string sqlConnectionString, List<string> repositories)
-        {
-            throw new NotImplementedException();
         }
 
         private static string GetRequiredOption(CommandOption option)
