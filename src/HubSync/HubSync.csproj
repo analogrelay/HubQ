@@ -7,6 +7,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.CommandLineUtils.Sources" Version="2.0.0-preview2-*" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="2.0.0-preview2-*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="2.0.0-preview2-*" />
+  </ItemGroup>
+  <ItemGroup>
+    <DotNetCliToolReference Include="Microsoft.EntityFrameworkCore.Tools.DotNet" Version="2.0.0-preview2-*" />
   </ItemGroup>
 
 </Project>

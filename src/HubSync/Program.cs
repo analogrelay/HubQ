@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Logging;
 
 namespace HubSync
 {
@@ -29,6 +30,9 @@ namespace HubSync
             // Repositories to sync
             var repositoryArgument = app.Argument("<REPOSITORIES...>", "Repositories to sync, in the form [owner]/[repo]", multipleValues: true);
 
+            // Logging options
+            var verboseOption = app.Option("-v|--verbose", "Be verbose", CommandOptionType.NoValue);
+
             app.OnExecute(() =>
             {
                 // Validate arguments
@@ -37,8 +41,7 @@ namespace HubSync
                     token: GetRequiredOption(tokenOption),
                     sqlConnectionString: GetRequiredOption(sqlConnectionStringOption),
                     repositories: repositoryArgument.Values,
-                    stdout: Console.Out,
-                    stderr: Console.Error);
+                    loggerFactory: CreateLogger(verboseOption.HasValue()));
 
                 return command.ExecuteAsync();
             });
@@ -58,6 +61,17 @@ namespace HubSync
                 Console.WriteLine($": {clex.Message}");
                 return 1;
             }
+        }
+
+        private static ILoggerFactory CreateLogger(bool verbose)
+        {
+            var factory = new LoggerFactory();
+            factory.AddProvider("Console", new CliConsoleLoggerProvider());
+            if (!verbose)
+            {
+                factory.AddFilter((_, _, level) => level >= LogLevel.Information);
+            }
+            return factory;
         }
 
         private static string GetRequiredOption(CommandOption option)
