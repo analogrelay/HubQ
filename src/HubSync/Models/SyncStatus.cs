@@ -1,9 +1,9 @@
-using System;
-
-namespace HubSync.Models
+﻿namespace HubSync.Models
 {
-    public class SyncStatus
+    public enum SyncStatus
     {
-        public DateTimeOffset? LastSyncCompleted { get; set; }
+        Created,
+        Synchronizing,
+        Synchronized
     }
 }
