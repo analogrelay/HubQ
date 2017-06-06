@@ -11,9 +11,10 @@ using System;
 namespace HubSync.Migrations
 {
     [DbContext(typeof(HubSyncContext))]
-    partial class HubSyncContextModelSnapshot : ModelSnapshot
+    [Migration("20170606190747_Initial")]
+    partial class Initial
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
             modelBuilder
                 .HasAnnotation("ProductVersion", "2.0.0-preview2-25446")
@@ -172,8 +173,6 @@ namespace HubSync.Migrations
                     b.Property<DateTime?>("CompletedUtc");
 
                     b.Property<DateTime>("CreatedUtc");
-
-                    b.Property<string>("Error");
 
                     b.Property<int>("RepositoryId");
 

@@ -13,11 +13,11 @@ namespace HubSync.Models
 
         public int GitHubId { get; set; }
 
-        public int MilestoneId { get; set; }
+        public int? MilestoneId { get; set; }
 
-        public int ClosedById { get; set; }
+        public int? ClosedById { get; set; }
 
-        public int UserId { get; set; }
+        public int? UserId { get; set; }
 
         public bool Locked { get; set; }
 
@@ -49,8 +49,8 @@ namespace HubSync.Models
 
         public virtual Milestone Milestone { get; set; }
 
-        public virtual IList<IssueAssignee> Assignees { get; set; }
+        public virtual IList<IssueAssignee> Assignees { get; set; } = new List<IssueAssignee>();
 
-        public virtual IList<IssueLabel> Labels { get; set; }
+        public virtual IList<IssueLabel> Labels { get; set; } = new List<IssueLabel>();
     }
 }

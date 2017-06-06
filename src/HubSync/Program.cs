@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Logging;
@@ -15,6 +16,14 @@ namespace HubSync
 
         static int Main(string[] args)
         {
+            if(args.Any(a => a == "--debug"))
+            {
+                args = args.Where(a => a != "--debug").ToArray();
+                Console.WriteLine($"Waiting for Debugger to attach. Process ID: {Process.GetCurrentProcess().Id}");
+                Console.WriteLine("Press ENTER to continue");
+                Console.ReadLine();
+            }
+
             var app = new CommandLineApplication();
             app.Name = Name;
             app.FullName = "HubSync - GitHub Issue Synchronizer";
@@ -22,11 +31,13 @@ namespace HubSync
 
             app.Command("sync", cmd =>
             {
+                cmd.Description = "Sync changes to issues in the specific repository to the database";
+
                 // GitHub connection information
                 var tokenOption = cmd.Option("-t|--token <TOKEN>", "The GitHub OAuth Token to use to authenticate", CommandOptionType.SingleValue);
 
                 // Destination connection information
-                var sqlConnectionStringOption = cmd.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server to sync issues to", CommandOptionType.SingleValue);
+                var sqlConnectionStringOption = cmd.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server database to sync issues to", CommandOptionType.SingleValue);
 
                 // Repositories to sync
                 var repositoryArgument = cmd.Argument("<REPOSITORIES...>", "Repositories to sync, in the form [owner]/[repo]", multipleValues: true);
@@ -53,8 +64,10 @@ namespace HubSync
 
             app.Command("migrate", cmd =>
             {
+                cmd.Description = "Migrate the database to the latest version";
+
                 // Destination connection information
-                var sqlConnectionStringOption = cmd.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server to sync issues to", CommandOptionType.SingleValue);
+                var sqlConnectionStringOption = cmd.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server database to migrate.", CommandOptionType.SingleValue);
 
                 // Logging options
                 var verboseOption = cmd.Option("-v|--verbose", "Be verbose", CommandOptionType.NoValue);
@@ -68,6 +81,46 @@ namespace HubSync
 
                     return command.ExecuteAsync();
                 });
+            });
+
+            app.Command("reset", cmd =>
+            {
+                cmd.Description = "Reset the database";
+
+                // Destination connection information
+                var sqlConnectionStringOption = cmd.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server database to reset.", CommandOptionType.SingleValue);
+
+                // Logging options
+                var verboseOption = cmd.Option("-v|--verbose", "Be verbose", CommandOptionType.NoValue);
+
+                cmd.OnExecute(() =>
+                {
+                    // Validate arguments
+                    var command = new ResetCommand(
+                            sqlConnectionString: GetRequiredOption(sqlConnectionStringOption),
+                            loggerFactory: CreateLogger(verboseOption.HasValue()));
+
+                    return command.ExecuteAsync();
+                });
+            });
+
+            app.Command("help", cmd =>
+            {
+                cmd.Description = "Get help for a specific command";
+
+                var subcommandArgument = cmd.Argument("<COMMAND>", "A command to get help for");
+
+                cmd.OnExecute(() =>
+                {
+                    app.ShowHelp(subcommandArgument.Value);
+                    return 0;
+                });
+            });
+
+            app.OnExecute(() =>
+            {
+                app.ShowHelp();
+                return 0;
             });
 
             try

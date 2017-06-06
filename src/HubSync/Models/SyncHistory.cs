@@ -14,6 +14,8 @@ namespace HubSync.Models
 
         public SyncStatus Status { get; set; }
 
+        public string Error { get; set; }
+
         public string Agent { get; set; }
 
         public virtual Repository Repository { get; set; }

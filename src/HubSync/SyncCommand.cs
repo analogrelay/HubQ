@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using HubSync.Models;
@@ -10,8 +11,6 @@ namespace HubSync
 {
     public class SyncCommand
     {
-        private readonly string _userName;
-        private readonly string _token;
         private readonly string _sqlConnectionString;
         private readonly IList<string> _repositories;
         private readonly string _agent;
@@ -19,6 +18,10 @@ namespace HubSync
         private readonly ILogger<SyncCommand> _logger;
         private readonly HubSyncContext _context;
         private readonly Octokit.IGitHubClient _github;
+
+        private Dictionary<int, int> _userCache = new Dictionary<int, int>();
+        private Dictionary<Tuple<int, string>, int> _labelCache = new Dictionary<Tuple<int, string>, int>();
+        private Dictionary<Tuple<int, int>, int> _milestoneCache = new Dictionary<Tuple<int, int>, int>();
 
         public SyncCommand(Octokit.Credentials gitHubCredentials, string sqlConnectionString, IList<string> repositories, string agent, ILoggerFactory loggerFactory)
         {
@@ -85,22 +88,39 @@ namespace HubSync
             // Create the new sync history entry
             var syncHistory = await RecordStartSync(repo);
 
-            // Fetch all issues modified since the last sync
-            var request = CreateIssueRequest(syncTime);
-
-            // Fetch the data
-            var apiOptions = new Octokit.ApiOptions()
+            try
             {
-                PageSize = 100
-            };
+                // Fetch all issues modified since the last sync
+                var request = CreateIssueRequest(syncTime);
 
-            var issues = await _github.Issue.GetAllForRepository(repo.Owner, repo.Name, request, apiOptions);
+                // Fetch the data
+                var apiOptions = new Octokit.ApiOptions()
+                {
+                    PageSize = 100
+                };
 
-            await IngestIssuesAsync(issues, repo, syncTime);
+                var issues = await _github.Issue.GetAllForRepository(repo.Owner, repo.Name, request, apiOptions);
 
-            // Grab API info (for rate limit impact)
-            var apiInfo = _github.GetLastApiInfo();
-            _logger.LogInformation("Synced issues for '{repo}'. Rate Limit remaining: {remainingRateLimit}", repo, apiInfo.RateLimit.Remaining);
+                // Grab API info (for rate limit impact)
+                var apiInfo = _github.GetLastApiInfo();
+                _logger.LogInformation("Fetched issues for '{repo}'. Rate Limit remaining: {remainingRateLimit}", repo, apiInfo.RateLimit.Remaining);
+
+                await IngestIssuesAsync(issues, repo, syncTime);
+
+                // Update sync history
+                syncHistory.Status = SyncStatus.Synchronized;
+                syncHistory.CompletedUtc = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                // Record the error
+                syncHistory.Error = ex.ToString();
+                syncHistory.Status = SyncStatus.Failed;
+                await _context.SaveChangesAsync();
+
+                throw;
+            }
 
             return true;
         }
@@ -109,65 +129,178 @@ namespace HubSync
         {
             foreach (var issue in issues)
             {
+                var stopwatch = Stopwatch.StartNew();
                 // Check if we need to create a new issue
-                Issue issueModel;
-                if (issue.CreatedAt < lastSyncTime)
-                {
-                    // We should have an issue already
-                    issueModel = await _context.Issues
-                        .FirstOrDefaultAsync(i => i.RepositoryId == repo.Id && i.Number == issue.Number);
-                }
-                else
+                var issueModel = await _context.Issues
+                    .Include(i => i.Assignees).ThenInclude(a => a.User)
+                    .Include(i => i.Labels).ThenInclude(l => l.Label)
+                    .FirstOrDefaultAsync(i => i.RepositoryId == repo.Id && i.Number == issue.Number);
+                var newIssue = false;
+                if (issueModel == null)
                 {
                     issueModel = new Issue()
                     {
                         RepositoryId = repo.Id
                     };
+                    newIssue = true;
                 }
 
                 issueModel.Body = issue.Body;
                 issueModel.ClosedAt = issue.ClosedAt;
-                issueModel.ClosedById = (await GetOrCreateUserAsync(issue.ClosedBy)).Id;
                 issueModel.CommentCount = issue.Comments;
                 issueModel.CreatedAt = issue.CreatedAt;
                 issueModel.GitHubId = issue.Id;
                 issueModel.HtmlUrl = issue.HtmlUrl.ToString();
                 issueModel.Locked = issue.Locked;
-                issueModel.MilestoneId = (await GetOrCreateMilestoneAsync(issue.Milestone)).Id;
                 issueModel.Number = issue.Number;
-                issueModel.PullRequestUrl = issue.PullRequest?.HtmlUrl;
-                issueModel.RepositoryId = repo.Id,
+                issueModel.PullRequestUrl = issue.PullRequest?.HtmlUrl?.ToString();
+                issueModel.RepositoryId = repo.Id;
                 issueModel.State = issue.State == Octokit.ItemState.Open ? IssueState.Open : IssueState.Closed;
                 issueModel.Title = issue.Title;
                 issueModel.UpdatedAt = issue.UpdatedAt;
-                issueModel.Url = issue.Url.ToString();
-                issueModel.UserId = (await GetOrCreateUserAsync(issue.User)).Id;
+                issueModel.Url = issue.Url?.ToString();
 
-                // Assignees and labels TODO
-                issueModel.Assignees = ?;
-                issueModel.Labels = ?;
+                if (issue.Milestone != null)
+                {
+                    issueModel.MilestoneId = await GetOrCreateMilestoneAsync(issue.Milestone, repo.Id);
+                }
+
+                if (issue.ClosedBy != null)
+                {
+                    issueModel.ClosedById = await GetOrCreateUserAsync(issue.ClosedBy);
+                }
+
+                if (issue.User != null)
+                {
+                    issueModel.UserId = await GetOrCreateUserAsync(issue.User);
+                }
+
+                await SyncList(
+                    issueModel.Assignees,
+                    issue.Assignees,
+                    _context.IssueAssignees,
+                    equalityComparer: (left, right) => left.Id == right.User.GitHubId,
+                    createItem: async assignee => new IssueAssignee()
+                    {
+                        UserId = await GetOrCreateUserAsync(assignee)
+                    });
+
+                await SyncList(
+                    issueModel.Labels,
+                    issue.Labels,
+                    _context.IssueLabels,
+                    equalityComparer: (left, right) => {
+                        if(right.Label == null)
+                        {
+                            Console.WriteLine("Label is null! Left side was: " + left.Name);
+                        }
+                        return left.Name == right.Label.Name;
+                    },
+                    createItem: async l => new IssueLabel()
+                    {
+                        LabelId = await GetOrCreateLabelAsync(l, repo.Id)
+                    });
+
+                if (newIssue)
+                {
+                    _context.Issues.Add(issueModel);
+                }
+
+                stopwatch.Stop();
+                await _context.SaveChangesAsync();
+                _logger.LogTrace("Synced issue #{number} - {title} in {elapsedMs:0.00}ms", issue.Number, issue.Title, stopwatch.ElapsedMilliseconds);
             }
         }
 
-        private async Task<Milestone> GetOrCreateMilestoneAsync(Octokit.Milestone githubMilestone)
+        private static async Task SyncList<TSource, TTarget>(
+            IList<TTarget> targetList,
+            IReadOnlyList<TSource> sourceList,
+            DbSet<TTarget> contextList,
+            Func<TSource, TTarget, bool> equalityComparer,
+            Func<TSource, Task<TTarget>> createItem) where TTarget: class
         {
+            var toRemove = new List<TTarget>();
+            foreach (var targetItem in targetList)
+            {
+                if (!sourceList.Any(u => equalityComparer(u, targetItem)))
+                {
+                    // Remove this one
+                    toRemove.Add(targetItem);
+                }
+            }
+
+            foreach (var removedItem in toRemove)
+            {
+                targetList.Remove(removedItem);
+                contextList.Remove(removedItem);
+            }
+
+            foreach (var sourceItem in sourceList)
+            {
+                if (!targetList.Any(u => equalityComparer(sourceItem, u)))
+                {
+                    targetList.Add(await createItem(sourceItem));
+                }
+            }
+        }
+
+        private async Task<int> GetOrCreateLabelAsync(Octokit.Label githubLabel, int repoId)
+        {
+            if (_labelCache.TryGetValue(Tuple.Create(repoId, githubLabel.Name), out var labelId))
+            {
+                return labelId;
+            }
+
+            var label = await _context.Labels
+                .FirstOrDefaultAsync(l => l.RepositoryId == repoId && l.Name == githubLabel.Name);
+            if (label == null)
+            {
+                label = new Label()
+                {
+                    RepositoryId = repoId,
+                    Name = githubLabel.Name,
+                    Color = githubLabel.Color
+                };
+                _context.Labels.Add(label);
+                await _context.SaveChangesAsync();
+            }
+
+            _labelCache[Tuple.Create(repoId, label.Name)] = label.Id;
+            return label.Id;
+        }
+
+        private async Task<int> GetOrCreateMilestoneAsync(Octokit.Milestone githubMilestone, int repoId)
+        {
+            if (_milestoneCache.TryGetValue(Tuple.Create(repoId, githubMilestone.Number), out var milestoneId))
+            {
+                return milestoneId;
+            }
+
             var milestone = await _context.Milestones
-                .FirstOrDefaultAsync(m => m.GitHubId == githubMilestone.Id);
+                .FirstOrDefaultAsync(m => m.RepositoryId == repoId && m.Number == githubMilestone.Number);
             if (milestone == null)
             {
                 milestone = new Milestone()
                 {
-                    GitHubId = githubMilestone.Id,
+                    RepositoryId = repoId,
+                    Number = githubMilestone.Number,
                     Title = githubMilestone.Title
                 };
                 _context.Milestones.Add(milestone);
                 await _context.SaveChangesAsync();
             }
-            return milestone;
+
+            _milestoneCache[Tuple.Create(repoId, milestone.Number)] = milestone.Id;
+            return milestone.Id;
         }
 
-        private async Task<User> GetOrCreateUserAsync(Octokit.User githubUser)
+        private async Task<int> GetOrCreateUserAsync(Octokit.User githubUser)
         {
+            if (_userCache.TryGetValue(githubUser.Id, out var userId))
+            {
+                return userId;
+            }
+
             var user = await _context.Users
                 .FirstOrDefaultAsync(r => r.Login == githubUser.Login);
             if (user == null)
@@ -181,7 +314,9 @@ namespace HubSync
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
             }
-            return user;
+
+            _userCache[user.GitHubId] = user.Id;
+            return user.Id;
         }
 
         private async Task<Repository> GetOrCreateRepoAsync(string fullName)
@@ -208,11 +343,12 @@ namespace HubSync
             return repo;
         }
 
-        private static Octokit.RepositoryIssueRequest CreateIssueRequest(DateTime syncTime)
+        private Octokit.RepositoryIssueRequest CreateIssueRequest(DateTime syncTime)
         {
             var request = new Octokit.RepositoryIssueRequest();
             if (syncTime != DateTime.MinValue)
             {
+                _logger.LogInformation("Last sync was at {syncTime}. Fetching changes since then.", syncTime.ToLocalTime());
                 request.Since = new DateTimeOffset(syncTime, TimeSpan.Zero);
             }
             return request;
@@ -234,12 +370,12 @@ namespace HubSync
 
         private async Task<(bool success, DateTime syncTime)> GetLastSyncTimeAsync(Repository repo)
         {
-            // Normalize the repo name
+            // Find the last successful non-failed status.
             var latest = await _context.SyncHistory
-                .Where(h => h.RepositoryId == repo.Id)
+                .Where(h => h.RepositoryId == repo.Id && h.Status != SyncStatus.Failed)
                 .OrderByDescending(h => h.CompletedUtc)
                 .FirstOrDefaultAsync();
-            if (latest?.Status != SyncStatus.Synchronized)
+            if (latest != null && latest.Status != SyncStatus.Synchronized)
             {
                 _logger.LogError("A synchronization is already underway by agent '{agent}'.", latest.Agent);
                 _logger.LogError("If you need to forcibly cancel it, run the 'cancel' command. This will NOT stop active processes attempting to synchronize it.");

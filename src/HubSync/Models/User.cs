@@ -12,10 +12,10 @@ namespace HubSync.Models
 
         public string AvatarUrl { get; set; }
 
-        public virtual IList<Issue> CreatedIssues { get; set; }
+        public virtual IList<Issue> CreatedIssues { get; set; } = new List<Issue>();
 
-        public virtual IList<Issue> ClosedIssues { get; set; }
+        public virtual IList<Issue> ClosedIssues { get; set; } = new List<Issue>();
 
-        public virtual IList<IssueAssignee> AssignedIssues { get; set; }
+        public virtual IList<IssueAssignee> AssignedIssues { get; set; } = new List<IssueAssignee>();
     }
 }

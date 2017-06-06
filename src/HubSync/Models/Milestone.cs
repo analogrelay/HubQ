@@ -6,10 +6,14 @@ namespace HubSync.Models
     {
         public int Id { get; set; }
 
-        public int GitHubId { get; set; }
+        public int RepositoryId { get; set; }
+
+        public int Number { get; set; }
 
         public string Title { get; set; }
 
-        public virtual IList<Issue> Issues { get; internal set; }
+        public virtual Repository Repository { get; internal set; }
+
+        public virtual IList<Issue> Issues { get; internal set; } = new List<Issue>();
     }
 }
