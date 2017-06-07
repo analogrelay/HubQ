@@ -22,6 +22,7 @@ namespace HubSync
         public async Task<int> ExecuteAsync()
         {
             var options = new DbContextOptionsBuilder<HubSyncContext>()
+                .UseLoggerFactory(_loggerFactory)
                 .UseSqlServer(_sqlConnectionString)
                 .Options;
             var context = new HubSyncContext(options);

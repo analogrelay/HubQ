@@ -33,6 +33,8 @@ namespace HubSync
 
             // Set up EF
             var options = new DbContextOptionsBuilder<HubSyncContext>()
+                .EnableSensitiveDataLogging(true)
+                .UseLoggerFactory(loggerFactory)
                 .UseSqlServer(_sqlConnectionString)
                 .Options;
             _context = new HubSyncContext(options);
@@ -90,22 +92,21 @@ namespace HubSync
 
             try
             {
-                // Fetch all issues modified since the last sync
-                var request = CreateIssueRequest(syncTime);
-
                 // Fetch the data
                 var apiOptions = new Octokit.ApiOptions()
                 {
                     PageSize = 100
                 };
 
-                var issues = await _github.Issue.GetAllForRepository(repo.Owner, repo.Name, request, apiOptions);
+                var issues = await _github.Issue.GetAllForRepository(repo.Owner, repo.Name, CreateIssueRequest(syncTime), apiOptions);
 
                 // Grab API info (for rate limit impact)
                 var apiInfo = _github.GetLastApiInfo();
-                _logger.LogInformation("Fetched issues for '{repo}'. Rate Limit remaining: {remainingRateLimit}", repo, apiInfo.RateLimit.Remaining);
+                _logger.LogInformation("Fetched issues for '{repo}'. Rate Limit remaining: {remainingRateLimit}", $"{repo.Owner}/{repo.Name}", apiInfo.RateLimit.Remaining);
 
                 await IngestIssuesAsync(issues, repo, syncTime);
+
+                _logger.LogInformation("Synced {issueCount} issues.", issues.Count);
 
                 // Update sync history
                 syncHistory.Status = SyncStatus.Synchronized;
@@ -129,86 +130,126 @@ namespace HubSync
         {
             foreach (var issue in issues)
             {
-                var stopwatch = Stopwatch.StartNew();
-                // Check if we need to create a new issue
-                var issueModel = await _context.Issues
-                    .Include(i => i.Assignees).ThenInclude(a => a.User)
-                    .Include(i => i.Labels).ThenInclude(l => l.Label)
-                    .FirstOrDefaultAsync(i => i.RepositoryId == repo.Id && i.Number == issue.Number);
-                var newIssue = false;
-                if (issueModel == null)
+                await IngestIssueAsync(repo, issue);
+            }
+        }
+
+        private async Task IngestIssueAsync(Repository repo, Octokit.Issue issue)
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            // Check if we need to create a new issue
+            var issueModel = await _context.Issues
+                .Include(i => i.Assignees).ThenInclude(a => a.User)
+                .Include(i => i.Labels).ThenInclude(l => l.Label)
+                .FirstOrDefaultAsync(i => i.RepositoryId == repo.Id && i.Number == issue.Number);
+            var newIssue = false;
+            if (issueModel == null)
+            {
+                issueModel = new Issue()
                 {
-                    issueModel = new Issue()
+                    RepositoryId = repo.Id
+                };
+                newIssue = true;
+            }
+
+            issueModel.PullRequest = await CreatePullRequestAsync(repo, issue.PullRequest);
+
+            issueModel.Body = issue.Body;
+            issueModel.ClosedAt = issue.ClosedAt;
+            issueModel.CommentCount = issue.Comments;
+            issueModel.CreatedAt = issue.CreatedAt;
+            issueModel.GitHubId = issue.Id;
+            issueModel.HtmlUrl = issue.HtmlUrl.ToString();
+            issueModel.Locked = issue.Locked;
+            issueModel.Number = issue.Number;
+            issueModel.RepositoryId = repo.Id;
+            issueModel.State = issue.State == Octokit.ItemState.Open ? IssueState.Open : IssueState.Closed;
+            issueModel.Title = issue.Title;
+            issueModel.UpdatedAt = issue.UpdatedAt;
+            issueModel.Url = issue.Url?.ToString();
+
+            if (issue.Milestone != null)
+            {
+                issueModel.MilestoneId = await GetOrCreateMilestoneAsync(issue.Milestone, repo.Id);
+            }
+
+            if (issue.ClosedBy != null)
+            {
+                issueModel.ClosedById = await GetOrCreateUserAsync(issue.ClosedBy);
+            }
+
+            if (issue.User != null)
+            {
+                issueModel.UserId = await GetOrCreateUserAsync(issue.User);
+            }
+
+            await SyncList(
+                issueModel.Assignees,
+                issue.Assignees,
+                _context.IssueAssignees,
+                equalityComparer: (left, right) => left.Id == right.User.GitHubId,
+                createItem: async assignee => new IssueAssignee()
+                {
+                    UserId = await GetOrCreateUserAsync(assignee)
+                });
+
+            await SyncList(
+                issueModel.Labels,
+                issue.Labels,
+                _context.IssueLabels,
+                equalityComparer: (left, right) =>
+                {
+                    if (right.Label == null)
                     {
-                        RepositoryId = repo.Id
-                    };
-                    newIssue = true;
-                }
-
-                issueModel.Body = issue.Body;
-                issueModel.ClosedAt = issue.ClosedAt;
-                issueModel.CommentCount = issue.Comments;
-                issueModel.CreatedAt = issue.CreatedAt;
-                issueModel.GitHubId = issue.Id;
-                issueModel.HtmlUrl = issue.HtmlUrl.ToString();
-                issueModel.Locked = issue.Locked;
-                issueModel.Number = issue.Number;
-                issueModel.PullRequestUrl = issue.PullRequest?.HtmlUrl?.ToString();
-                issueModel.RepositoryId = repo.Id;
-                issueModel.State = issue.State == Octokit.ItemState.Open ? IssueState.Open : IssueState.Closed;
-                issueModel.Title = issue.Title;
-                issueModel.UpdatedAt = issue.UpdatedAt;
-                issueModel.Url = issue.Url?.ToString();
-
-                if (issue.Milestone != null)
+                        Console.WriteLine("Label is null! Left side was: " + left.Name);
+                    }
+                    return left.Name == right.Label.Name;
+                },
+                createItem: async l => new IssueLabel()
                 {
-                    issueModel.MilestoneId = await GetOrCreateMilestoneAsync(issue.Milestone, repo.Id);
-                }
+                    LabelId = await GetOrCreateLabelAsync(l, repo.Id)
+                });
 
-                if (issue.ClosedBy != null)
+            if (newIssue)
+            {
+                _context.Issues.Add(issueModel);
+            }
+
+            stopwatch.Stop();
+            await _context.SaveChangesAsync();
+            _logger.LogTrace((newIssue ? "Added" : "Updated") + " issue #{number} - {title} in {elapsedMs:0.00}ms", issue.Number, issue.Title, stopwatch.ElapsedMilliseconds);
+        }
+
+        private async Task<PullRequest> CreatePullRequestAsync(Models.Repository repo, Octokit.PullRequest pr)
+        {
+            if (pr == null)
+            {
+                return new PullRequest()
                 {
-                    issueModel.ClosedById = await GetOrCreateUserAsync(issue.ClosedBy);
-                }
-
-                if (issue.User != null)
+                    IsPr = false
+                };
+            }
+            else
+            {
+                var prModel = new PullRequest()
                 {
-                    issueModel.UserId = await GetOrCreateUserAsync(issue.User);
-                }
+                    IsPr = true,
+                    BaseRef = pr.Base?.Ref,
+                    BaseSha = pr.Base?.Sha,
+                    ChangedFiles = pr.ChangedFiles,
+                    HeadRef = pr.Head?.Ref,
+                    HeadSha = pr.Head?.Sha,
+                    Mergeable = pr.Mergeable,
+                    MergedAt = pr.MergedAt,
+                };
 
-                await SyncList(
-                    issueModel.Assignees,
-                    issue.Assignees,
-                    _context.IssueAssignees,
-                    equalityComparer: (left, right) => left.Id == right.User.GitHubId,
-                    createItem: async assignee => new IssueAssignee()
-                    {
-                        UserId = await GetOrCreateUserAsync(assignee)
-                    });
-
-                await SyncList(
-                    issueModel.Labels,
-                    issue.Labels,
-                    _context.IssueLabels,
-                    equalityComparer: (left, right) => {
-                        if(right.Label == null)
-                        {
-                            Console.WriteLine("Label is null! Left side was: " + left.Name);
-                        }
-                        return left.Name == right.Label.Name;
-                    },
-                    createItem: async l => new IssueLabel()
-                    {
-                        LabelId = await GetOrCreateLabelAsync(l, repo.Id)
-                    });
-
-                if (newIssue)
+                if (pr.MergedBy != null)
                 {
-                    _context.Issues.Add(issueModel);
+                    prModel.MergedById = await GetOrCreateUserAsync(pr.MergedBy);
                 }
 
-                stopwatch.Stop();
-                await _context.SaveChangesAsync();
-                _logger.LogTrace("Synced issue #{number} - {title} in {elapsedMs:0.00}ms", issue.Number, issue.Title, stopwatch.ElapsedMilliseconds);
+                return prModel;
             }
         }
 
@@ -217,7 +258,7 @@ namespace HubSync
             IReadOnlyList<TSource> sourceList,
             DbSet<TTarget> contextList,
             Func<TSource, TTarget, bool> equalityComparer,
-            Func<TSource, Task<TTarget>> createItem) where TTarget: class
+            Func<TSource, Task<TTarget>> createItem) where TTarget : class
         {
             var toRemove = new List<TTarget>();
             foreach (var targetItem in targetList)
@@ -235,12 +276,19 @@ namespace HubSync
                 contextList.Remove(removedItem);
             }
 
+            var toAdd = new List<TTarget>();
             foreach (var sourceItem in sourceList)
             {
                 if (!targetList.Any(u => equalityComparer(sourceItem, u)))
                 {
-                    targetList.Add(await createItem(sourceItem));
+                    // Don't add directly because this item won't be usable in the equality comparer.
+                    toAdd.Add(await createItem(sourceItem));
                 }
+            }
+
+            foreach (var addedItem in toAdd)
+            {
+                targetList.Add(addedItem);
             }
         }
 
@@ -332,8 +380,10 @@ namespace HubSync
                 .FirstOrDefaultAsync(r => r.Owner == owner && r.Name == name);
             if (repo == null)
             {
+                var githubRepo = await _github.Repository.Get(owner, name);
                 repo = new Repository()
                 {
+                    GitHubId = githubRepo.Id,
                     Owner = owner.ToLowerInvariant(),
                     Name = name.ToLowerInvariant()
                 };

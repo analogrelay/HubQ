@@ -55,7 +55,7 @@ namespace HubSync
                 Console.ForegroundColor = oldFg;
                 Console.BackgroundColor = oldBg;
 
-                Console.WriteLine($": {message}");
+                Console.WriteLine($": [{_categoryName}] {message}");
             }
         }
 

@@ -42,8 +42,8 @@ namespace HubSync
                 // Repositories to sync
                 var repositoryArgument = cmd.Argument("<REPOSITORIES...>", "Repositories to sync, in the form [owner]/[repo]", multipleValues: true);
 
-                // Logging options
-                var verboseOption = cmd.Option("-v|--verbose", "Be verbose", CommandOptionType.NoValue);
+                var loggingOptions = LoggingOptions.Register(cmd);
+
                 var agentOption = cmd.Option("-a|--agent-name", "A name for this agent that can identify it in the database", CommandOptionType.SingleValue);
 
                 var process = Process.GetCurrentProcess();
@@ -56,7 +56,7 @@ namespace HubSync
                             sqlConnectionString: GetRequiredOption(sqlConnectionStringOption),
                             repositories: repositoryArgument.Values,
                             agent: GetOptionalOption(agentOption, $"{domain}\\{Environment.UserName} on {Environment.MachineName}, {process.ProcessName}:{process.Id}"),
-                            loggerFactory: CreateLogger(verboseOption.HasValue()));
+                            loggerFactory: loggingOptions.CreateLoggerFactory());
 
                     return command.ExecuteAsync();
                 });
@@ -69,15 +69,14 @@ namespace HubSync
                 // Destination connection information
                 var sqlConnectionStringOption = cmd.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server database to migrate.", CommandOptionType.SingleValue);
 
-                // Logging options
-                var verboseOption = cmd.Option("-v|--verbose", "Be verbose", CommandOptionType.NoValue);
+                var loggingOptions = LoggingOptions.Register(cmd);
 
                 cmd.OnExecute(() =>
                 {
                     // Validate arguments
                     var command = new MigrateCommand(
                             sqlConnectionString: GetRequiredOption(sqlConnectionStringOption),
-                            loggerFactory: CreateLogger(verboseOption.HasValue()));
+                            loggerFactory: loggingOptions.CreateLoggerFactory());
 
                     return command.ExecuteAsync();
                 });
@@ -90,15 +89,14 @@ namespace HubSync
                 // Destination connection information
                 var sqlConnectionStringOption = cmd.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server database to reset.", CommandOptionType.SingleValue);
 
-                // Logging options
-                var verboseOption = cmd.Option("-v|--verbose", "Be verbose", CommandOptionType.NoValue);
+                var loggingOptions = LoggingOptions.Register(cmd);
 
                 cmd.OnExecute(() =>
                 {
                     // Validate arguments
                     var command = new ResetCommand(
                             sqlConnectionString: GetRequiredOption(sqlConnectionStringOption),
-                            loggerFactory: CreateLogger(verboseOption.HasValue()));
+                            loggerFactory: loggingOptions.CreateLoggerFactory());
 
                     return command.ExecuteAsync();
                 });
@@ -142,24 +140,6 @@ namespace HubSync
 
         private static string GetOptionalOption(CommandOption option, string defaultValue = default(string))
             => option.HasValue() ? option.Value() : defaultValue;
-
-        private static ILoggerFactory CreateLogger(bool verbose)
-        {
-            var filters = new LoggerFilterOptions();
-            if (!verbose)
-            {
-                filters.Rules.Add(new LoggerFilterRule(
-                    providerName: null,
-                    categoryName: null,
-                    logLevel: LogLevel.Information,
-                    filter: (_, __, ___) => true));
-            }
-
-            var factory = new LoggerFactory(new[] {
-                new CliConsoleLoggerProvider()
-            }, filters);
-            return factory;
-        }
 
         private static string GetRequiredOption(CommandOption option)
         {

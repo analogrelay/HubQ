@@ -25,6 +25,7 @@ namespace HubSync
             _logger.LogInformation("Running database migrations...");
 
             var options = new DbContextOptionsBuilder<HubSyncContext>()
+                .UseLoggerFactory(_loggerFactory)
                 .UseSqlServer(_sqlConnectionString)
                 .Options;
             var context = new HubSyncContext(options);

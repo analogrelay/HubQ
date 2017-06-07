@@ -15,7 +15,7 @@ namespace HubSync.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn),
-                    GitHubId = table.Column<int>(type: "int", nullable: false),
+                    GitHubId = table.Column<long>(type: "bigint", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Owner = table.Column<string>(type: "nvarchar(450)", nullable: false)
                 },
@@ -96,6 +96,7 @@ namespace HubSync.Migrations
                     Agent = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CompletedUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Error = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     RepositoryId = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false)
                 },
@@ -123,6 +124,7 @@ namespace HubSync.Migrations
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     GitHubId = table.Column<int>(type: "int", nullable: false),
                     HtmlUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsPr = table.Column<bool>(type: "bit", nullable: false),
                     Locked = table.Column<bool>(type: "bit", nullable: false),
                     MilestoneId = table.Column<int>(type: "int", nullable: true),
                     Number = table.Column<int>(type: "int", nullable: false),
@@ -132,7 +134,16 @@ namespace HubSync.Migrations
                     Title = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     Url = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    UserId = table.Column<int>(type: "int", nullable: true)
+                    UserId = table.Column<int>(type: "int", nullable: true),
+                    PullRequest_BaseRef = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PullRequest_BaseSha = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PullRequest_ChangedFiles = table.Column<int>(type: "int", nullable: false),
+                    PullRequest_HeadRef = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PullRequest_HeadSha = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PullRequest_IsPr = table.Column<bool>(type: "bit", nullable: false),
+                    PullRequest_Mergeable = table.Column<bool>(type: "bit", nullable: true),
+                    PullRequest_MergedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    PullRequest_MergedById = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -160,6 +171,12 @@ namespace HubSync.Migrations
                     table.ForeignKey(
                         name: "FK_Issues_Users_UserId",
                         column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Issues_Users_PullRequest_MergedById",
+                        column: x => x.PullRequest_MergedById,
                         principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
@@ -242,6 +259,11 @@ namespace HubSync.Migrations
                 name: "IX_Issues_UserId",
                 table: "Issues",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Issues_PullRequest_MergedById",
+                table: "Issues",
+                column: "PullRequest_MergedById");
 
             migrationBuilder.CreateIndex(
                 name: "IX_SyncHistory_RepositoryId",

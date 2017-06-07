@@ -41,6 +41,10 @@ namespace HubSync.Models
 
         public string Url { get; set; }
 
+        public bool IsPr { get; set; }
+
+        public PullRequest PullRequest { get; set; }
+
         public virtual User User { get; set; }
 
         public virtual User ClosedBy { get; set; }

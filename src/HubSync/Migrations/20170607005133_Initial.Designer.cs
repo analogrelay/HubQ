@@ -11,13 +11,13 @@ using System;
 namespace HubSync.Migrations
 {
     [DbContext(typeof(HubSyncContext))]
-    [Migration("20170606190747_Initial")]
+    [Migration("20170607005133_Initial")]
     partial class Initial
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
             modelBuilder
-                .HasAnnotation("ProductVersion", "2.0.0-preview2-25446")
+                .HasAnnotation("ProductVersion", "2.0.0-preview2-25502")
                 .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
             modelBuilder.Entity("HubSync.Models.Issue", b =>
@@ -38,6 +38,8 @@ namespace HubSync.Migrations
                     b.Property<int>("GitHubId");
 
                     b.Property<string>("HtmlUrl");
+
+                    b.Property<bool>("IsPr");
 
                     b.Property<bool>("Locked");
 
@@ -145,7 +147,7 @@ namespace HubSync.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd();
 
-                    b.Property<int>("GitHubId");
+                    b.Property<long>("GitHubId");
 
                     b.Property<string>("Name")
                         .IsRequired();
@@ -173,6 +175,8 @@ namespace HubSync.Migrations
                     b.Property<DateTime?>("CompletedUtc");
 
                     b.Property<DateTime>("CreatedUtc");
+
+                    b.Property<string>("Error");
 
                     b.Property<int>("RepositoryId");
 
@@ -207,11 +211,41 @@ namespace HubSync.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("HubSync.Models.PullRequest", b =>
+                {
+                    b.Property<int?>("IssueId");
+
+                    b.Property<string>("BaseRef");
+
+                    b.Property<string>("BaseSha");
+
+                    b.Property<int>("ChangedFiles");
+
+                    b.Property<string>("HeadRef");
+
+                    b.Property<string>("HeadSha");
+
+                    b.Property<bool>("IsPr");
+
+                    b.Property<bool?>("Mergeable");
+
+                    b.Property<DateTimeOffset?>("MergedAt");
+
+                    b.Property<int?>("MergedById");
+
+                    b.HasKey("IssueId");
+
+                    b.HasIndex("MergedById");
+
+                    b.ToTable("Issues");
+                });
+
             modelBuilder.Entity("HubSync.Models.Issue", b =>
                 {
                     b.HasOne("HubSync.Models.User", "ClosedBy")
                         .WithMany("ClosedIssues")
-                        .HasForeignKey("ClosedById");
+                        .HasForeignKey("ClosedById")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("HubSync.Models.Milestone", "Milestone")
                         .WithMany("Issues")
@@ -220,11 +254,13 @@ namespace HubSync.Migrations
 
                     b.HasOne("HubSync.Models.Repository", "Repository")
                         .WithMany("Issues")
-                        .HasForeignKey("RepositoryId");
+                        .HasForeignKey("RepositoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("HubSync.Models.User", "User")
                         .WithMany("CreatedIssues")
-                        .HasForeignKey("UserId");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("HubSync.Models.IssueAssignee", b =>
@@ -236,7 +272,8 @@ namespace HubSync.Migrations
 
                     b.HasOne("HubSync.Models.User", "User")
                         .WithMany("AssignedIssues")
-                        .HasForeignKey("UserId");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("HubSync.Models.IssueLabel", b =>
@@ -256,7 +293,8 @@ namespace HubSync.Migrations
                 {
                     b.HasOne("HubSync.Models.Repository", "Repository")
                         .WithMany("Labels")
-                        .HasForeignKey("RepositoryId");
+                        .HasForeignKey("RepositoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("HubSync.Models.Milestone", b =>
@@ -271,7 +309,20 @@ namespace HubSync.Migrations
                 {
                     b.HasOne("HubSync.Models.Repository", "Repository")
                         .WithMany("HistoryEntries")
-                        .HasForeignKey("RepositoryId");
+                        .HasForeignKey("RepositoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("HubSync.Models.PullRequest", b =>
+                {
+                    b.HasOne("HubSync.Models.Issue")
+                        .WithOne("PullRequest")
+                        .HasForeignKey("HubSync.Models.PullRequest", "IssueId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("HubSync.Models.User", "MergedBy")
+                        .WithMany()
+                        .HasForeignKey("MergedById");
                 });
         }
     }
