@@ -19,9 +19,9 @@ namespace HubSync
         private readonly HubSyncContext _context;
         private readonly Octokit.IGitHubClient _github;
 
-        private Dictionary<int, int> _userCache = new Dictionary<int, int>();
-        private Dictionary<Tuple<int, string>, int> _labelCache = new Dictionary<Tuple<int, string>, int>();
-        private Dictionary<Tuple<int, int>, int> _milestoneCache = new Dictionary<Tuple<int, int>, int>();
+        private Dictionary<int, User> _userCache = new Dictionary<int, User>();
+        private Dictionary<Tuple<int, string>, Label> _labelCache = new Dictionary<Tuple<int, string>, Label>();
+        private Dictionary<Tuple<int, int>, Milestone> _milestoneCache = new Dictionary<Tuple<int, int>, Milestone>();
 
         public SyncCommand(Octokit.Credentials gitHubCredentials, string sqlConnectionString, IList<string> repositories, string agent, ILoggerFactory loggerFactory)
         {
@@ -102,7 +102,7 @@ namespace HubSync
 
                 // Grab API info (for rate limit impact)
                 var apiInfo = _github.GetLastApiInfo();
-                _logger.LogInformation("Fetched issues for '{repo}'. Rate Limit remaining: {remainingRateLimit}", $"{repo.Owner}/{repo.Name}", apiInfo.RateLimit.Remaining);
+                _logger.LogInformation("Fetched {issueCount} issues for '{repo}'. Rate Limit remaining: {remainingRateLimit}", issues.Count, $"{repo.Owner}/{repo.Name}", apiInfo.RateLimit.Remaining);
 
                 await IngestIssuesAsync(issues, repo, syncTime);
 
@@ -132,6 +132,12 @@ namespace HubSync
             {
                 await IngestIssueAsync(repo, issue);
             }
+
+            var stopwatch = Stopwatch.StartNew();
+            _logger.LogInformation("Saving issues to database...");
+            await _context.SaveChangesAsync();
+            stopwatch.Stop();
+            _logger.LogInformation("Saved {issueCount} issues in {elapsedMs:0.00}ms", issues.Count, stopwatch.ElapsedMilliseconds);
         }
 
         private async Task IngestIssueAsync(Repository repo, Octokit.Issue issue)
@@ -171,17 +177,17 @@ namespace HubSync
 
             if (issue.Milestone != null)
             {
-                issueModel.MilestoneId = await GetOrCreateMilestoneAsync(issue.Milestone, repo.Id);
+                issueModel.Milestone = await GetOrCreateMilestoneAsync(issue.Milestone, repo.Id);
             }
 
             if (issue.ClosedBy != null)
             {
-                issueModel.ClosedById = await GetOrCreateUserAsync(issue.ClosedBy);
+                issueModel.ClosedBy = await GetOrCreateUserAsync(issue.ClosedBy);
             }
 
             if (issue.User != null)
             {
-                issueModel.UserId = await GetOrCreateUserAsync(issue.User);
+                issueModel.User = await GetOrCreateUserAsync(issue.User);
             }
 
             issueModel.Reactions = CreateReactions(issue.Reactions);
@@ -193,7 +199,7 @@ namespace HubSync
                 equalityComparer: (left, right) => left.Id == right.User.GitHubId,
                 createItem: async assignee => new IssueAssignee()
                 {
-                    UserId = await GetOrCreateUserAsync(assignee)
+                    User = await GetOrCreateUserAsync(assignee)
                 });
 
             await SyncList(
@@ -210,7 +216,7 @@ namespace HubSync
                 },
                 createItem: async l => new IssueLabel()
                 {
-                    LabelId = await GetOrCreateLabelAsync(l, repo.Id)
+                    Label = await GetOrCreateLabelAsync(l, repo.Id)
                 });
 
             if (newIssue)
@@ -219,7 +225,6 @@ namespace HubSync
             }
 
             stopwatch.Stop();
-            await _context.SaveChangesAsync();
             _logger.LogTrace((newIssue ? "Added" : "Updated") + " issue #{number} - {title} in {elapsedMs:0.00}ms", issue.Number, issue.Title, stopwatch.ElapsedMilliseconds);
         }
 
@@ -269,7 +274,7 @@ namespace HubSync
 
                 if (pr.MergedBy != null)
                 {
-                    prModel.MergedById = await GetOrCreateUserAsync(pr.MergedBy);
+                    prModel.MergedBy = await GetOrCreateUserAsync(pr.MergedBy);
                 }
 
                 return prModel;
@@ -315,14 +320,14 @@ namespace HubSync
             }
         }
 
-        private async Task<int> GetOrCreateLabelAsync(Octokit.Label githubLabel, int repoId)
+        private async Task<Label> GetOrCreateLabelAsync(Octokit.Label githubLabel, int repoId)
         {
-            if (_labelCache.TryGetValue(Tuple.Create(repoId, githubLabel.Name), out var labelId))
+            if (_labelCache.TryGetValue(Tuple.Create(repoId, githubLabel.Name), out var label))
             {
-                return labelId;
+                return label;
             }
 
-            var label = await _context.Labels
+            label = await _context.Labels
                 .FirstOrDefaultAsync(l => l.RepositoryId == repoId && l.Name == githubLabel.Name);
             if (label == null)
             {
@@ -333,21 +338,20 @@ namespace HubSync
                     Color = githubLabel.Color
                 };
                 _context.Labels.Add(label);
-                await _context.SaveChangesAsync();
             }
 
-            _labelCache[Tuple.Create(repoId, label.Name)] = label.Id;
-            return label.Id;
+            _labelCache[Tuple.Create(repoId, label.Name)] = label;
+            return label;
         }
 
-        private async Task<int> GetOrCreateMilestoneAsync(Octokit.Milestone githubMilestone, int repoId)
+        private async Task<Milestone> GetOrCreateMilestoneAsync(Octokit.Milestone githubMilestone, int repoId)
         {
-            if (_milestoneCache.TryGetValue(Tuple.Create(repoId, githubMilestone.Number), out var milestoneId))
+            if (_milestoneCache.TryGetValue(Tuple.Create(repoId, githubMilestone.Number), out var milestone))
             {
-                return milestoneId;
+                return milestone;
             }
 
-            var milestone = await _context.Milestones
+            milestone = await _context.Milestones
                 .FirstOrDefaultAsync(m => m.RepositoryId == repoId && m.Number == githubMilestone.Number);
             if (milestone == null)
             {
@@ -358,21 +362,20 @@ namespace HubSync
                     Title = githubMilestone.Title
                 };
                 _context.Milestones.Add(milestone);
-                await _context.SaveChangesAsync();
             }
 
-            _milestoneCache[Tuple.Create(repoId, milestone.Number)] = milestone.Id;
-            return milestone.Id;
+            _milestoneCache[Tuple.Create(repoId, milestone.Number)] = milestone;
+            return milestone;
         }
 
-        private async Task<int> GetOrCreateUserAsync(Octokit.User githubUser)
+        private async Task<User> GetOrCreateUserAsync(Octokit.User githubUser)
         {
-            if (_userCache.TryGetValue(githubUser.Id, out var userId))
+            if (_userCache.TryGetValue(githubUser.Id, out var user))
             {
-                return userId;
+                return user;
             }
 
-            var user = await _context.Users
+            user = await _context.Users
                 .FirstOrDefaultAsync(r => r.Login == githubUser.Login);
             if (user == null)
             {
@@ -383,11 +386,10 @@ namespace HubSync
                     AvatarUrl = githubUser.AvatarUrl
                 };
                 _context.Users.Add(user);
-                await _context.SaveChangesAsync();
             }
 
-            _userCache[user.GitHubId] = user.Id;
-            return user.Id;
+            _userCache[user.GitHubId] = user;
+            return user;
         }
 
         private async Task<Repository> GetOrCreateRepoAsync(string fullName)
@@ -411,7 +413,6 @@ namespace HubSync
                     Name = name.ToLowerInvariant()
                 };
                 _context.Repositories.Add(repo);
-                await _context.SaveChangesAsync();
             }
             return repo;
         }
