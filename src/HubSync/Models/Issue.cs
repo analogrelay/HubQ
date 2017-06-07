@@ -45,6 +45,8 @@ namespace HubSync.Models
 
         public PullRequest PullRequest { get; set; }
 
+        public Reactions Reactions { get; set; }
+
         public virtual User User { get; set; }
 
         public virtual User ClosedBy { get; set; }

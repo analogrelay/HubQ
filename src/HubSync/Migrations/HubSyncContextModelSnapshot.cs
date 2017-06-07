@@ -239,6 +239,29 @@ namespace HubSync.Migrations
                     b.ToTable("Issues");
                 });
 
+            modelBuilder.Entity("HubSync.Models.Reactions", b =>
+                {
+                    b.Property<int?>("IssueId");
+
+                    b.Property<int>("Confused");
+
+                    b.Property<int>("Heart");
+
+                    b.Property<int>("Hooray");
+
+                    b.Property<int>("Laugh");
+
+                    b.Property<int>("Minus1");
+
+                    b.Property<int>("Plus1");
+
+                    b.Property<int>("TotalCount");
+
+                    b.HasKey("IssueId");
+
+                    b.ToTable("Issues");
+                });
+
             modelBuilder.Entity("HubSync.Models.Issue", b =>
                 {
                     b.HasOne("HubSync.Models.User", "ClosedBy")
@@ -322,6 +345,14 @@ namespace HubSync.Migrations
                     b.HasOne("HubSync.Models.User", "MergedBy")
                         .WithMany()
                         .HasForeignKey("MergedById");
+                });
+
+            modelBuilder.Entity("HubSync.Models.Reactions", b =>
+                {
+                    b.HasOne("HubSync.Models.Issue")
+                        .WithOne("Reactions")
+                        .HasForeignKey("HubSync.Models.Reactions", "IssueId")
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
         }
     }

@@ -44,6 +44,8 @@ namespace HubSync.Models
                 .OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<Issue>()
                 .OwnsOne(i => i.PullRequest);
+            modelBuilder.Entity<Issue>()
+                .OwnsOne(i => i.Reactions);
 
             modelBuilder.Entity<IssueAssignee>()
                 .HasKey(ia => new { ia.IssueId, ia.UserId });

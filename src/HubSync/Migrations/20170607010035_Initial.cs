@@ -143,7 +143,14 @@ namespace HubSync.Migrations
                     PullRequest_IsPr = table.Column<bool>(type: "bit", nullable: false),
                     PullRequest_Mergeable = table.Column<bool>(type: "bit", nullable: true),
                     PullRequest_MergedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    PullRequest_MergedById = table.Column<int>(type: "int", nullable: true)
+                    PullRequest_MergedById = table.Column<int>(type: "int", nullable: true),
+                    Reactions_Confused = table.Column<int>(type: "int", nullable: false),
+                    Reactions_Heart = table.Column<int>(type: "int", nullable: false),
+                    Reactions_Hooray = table.Column<int>(type: "int", nullable: false),
+                    Reactions_Laugh = table.Column<int>(type: "int", nullable: false),
+                    Reactions_Minus1 = table.Column<int>(type: "int", nullable: false),
+                    Reactions_Plus1 = table.Column<int>(type: "int", nullable: false),
+                    Reactions_TotalCount = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {

@@ -184,6 +184,8 @@ namespace HubSync
                 issueModel.UserId = await GetOrCreateUserAsync(issue.User);
             }
 
+            issueModel.Reactions = CreateReactions(issue.Reactions);
+
             await SyncList(
                 issueModel.Assignees,
                 issue.Assignees,
@@ -219,6 +221,27 @@ namespace HubSync
             stopwatch.Stop();
             await _context.SaveChangesAsync();
             _logger.LogTrace((newIssue ? "Added" : "Updated") + " issue #{number} - {title} in {elapsedMs:0.00}ms", issue.Number, issue.Title, stopwatch.ElapsedMilliseconds);
+        }
+
+        private Reactions CreateReactions(Octokit.ReactionSummary reactions)
+        {
+            if (reactions == null)
+            {
+                return new Reactions();
+            }
+            else
+            {
+                return new Reactions()
+                {
+                    Confused = reactions.Confused,
+                    Plus1 = reactions.Plus1,
+                    Minus1 = reactions.Minus1,
+                    Hooray = reactions.Hooray,
+                    Heart = reactions.Heart,
+                    Laugh = reactions.Laugh,
+                    TotalCount = reactions.TotalCount
+                };
+            }
         }
 
         private async Task<PullRequest> CreatePullRequestAsync(Models.Repository repo, Octokit.PullRequest pr)
@@ -395,7 +418,11 @@ namespace HubSync
 
         private Octokit.RepositoryIssueRequest CreateIssueRequest(DateTime syncTime)
         {
-            var request = new Octokit.RepositoryIssueRequest();
+            var request = new Octokit.RepositoryIssueRequest()
+            {
+                State = Octokit.ItemStateFilter.All
+            };
+
             if (syncTime != DateTime.MinValue)
             {
                 _logger.LogInformation("Last sync was at {syncTime}. Fetching changes since then.", syncTime.ToLocalTime());
