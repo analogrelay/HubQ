@@ -1,11 +1,10 @@
 using System.Collections.Generic;
 
-namespace HubSync.Models
+namespace HubSync.Models.Sql
 {
     public class Repository
     {
         public int Id { get; set; }
-        public long GitHubId { get; set; }
         public string Owner { get; set; }
         public string Name { get; set; }
 

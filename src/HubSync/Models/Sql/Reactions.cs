@@ -1,4 +1,4 @@
-namespace HubSync.Models
+namespace HubSync.Models.Sql
 {
     public class Reactions
     {

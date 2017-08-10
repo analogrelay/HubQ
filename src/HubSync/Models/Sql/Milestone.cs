@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace HubSync.Models
+namespace HubSync.Models.Sql
 {
     public class Milestone
     {

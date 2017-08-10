@@ -1,6 +1,6 @@
 using System;
 
-namespace HubSync.Models
+namespace HubSync.Models.Sql
 {
     public class PullRequest
     {

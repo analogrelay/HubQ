@@ -2,11 +2,11 @@ using System;
 
 namespace HubSync.Models
 {
-    public class SyncHistory
+    public class SyncRecord
     {
-        public int Id { get; set; }
+        public string RepositoryOwner { get; set; }
 
-        public int RepositoryId { get; set; }
+        public string RepositoryName { get; set; }
 
         public DateTime CreatedUtc { get; set; }
 
@@ -17,7 +17,5 @@ namespace HubSync.Models
         public string Error { get; set; }
 
         public string Agent { get; set; }
-
-        public virtual Repository Repository { get; set; }
     }
 }
