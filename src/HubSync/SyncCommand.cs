@@ -11,39 +11,26 @@ namespace HubSync
 {
     public class SyncCommand
     {
-        private readonly string _sqlConnectionString;
-        private readonly IList<string> _repositories;
+        private readonly SyncTarget _syncTarget;
+        private readonly IReadOnlyList<string> _repositories;
         private readonly string _agent;
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<SyncCommand> _logger;
-        private readonly HubSyncContext _context;
         private readonly Octokit.IGitHubClient _github;
 
-        private Dictionary<int, User> _userCache = new Dictionary<int, User>();
-        private Dictionary<Tuple<int, string>, Label> _labelCache = new Dictionary<Tuple<int, string>, Label>();
-        private Dictionary<Tuple<int, int>, Milestone> _milestoneCache = new Dictionary<Tuple<int, int>, Milestone>();
-
-        public SyncCommand(Octokit.Credentials gitHubCredentials, string sqlConnectionString, IList<string> repositories, string agent, ILoggerFactory loggerFactory)
+        public SyncCommand(Octokit.Credentials gitHubCredentials, SyncTarget syncTarget, IReadOnlyList<string> repositories, string agent, ILoggerFactory loggerFactory)
         {
-            _sqlConnectionString = sqlConnectionString;
+            _syncTarget = syncTarget;
             _repositories = repositories;
             _agent = agent;
             _loggerFactory = loggerFactory;
             _logger = _loggerFactory.CreateLogger<SyncCommand>();
 
-            // Set up EF
-            var options = new DbContextOptionsBuilder<HubSyncContext>()
-                .EnableSensitiveDataLogging(true)
-                .UseLoggerFactory(loggerFactory)
-                .UseSqlServer(_sqlConnectionString)
-                .Options;
-            _context = new HubSyncContext(options);
-
             // Set up GitHub
             _github = new Octokit.GitHubClient(new Octokit.ProductHeaderValue("HubSync", Program.Version));
             _github.Connection.Credentials = gitHubCredentials;
 
-            if (repositories.Count == 0)
+            if (_repositories.Count == 0)
             {
                 throw new CommandLineException("At least one repository must be specified");
             }
@@ -51,13 +38,12 @@ namespace HubSync
 
         public async Task<int> ExecuteAsync()
         {
-            _logger.LogInformation("Checking database migration status ...");
+            _logger.LogDebug("Checking database schema status ...");
 
-            // Check for outstanding migrations
-            var pendingMigrations = await _context.Database.GetPendingMigrationsAsync();
-            if (pendingMigrations.Any())
+            // Verify database is ready
+            if (!await _syncTarget.IsSchemaUpToDateAsync())
             {
-                return PendingMigrationsError(pendingMigrations);
+                return 1;
             }
 
             _logger.LogInformation("Database schema is up-to-date.");
@@ -78,17 +64,21 @@ namespace HubSync
         private async Task<bool> TrySyncRepo(string repoName)
         {
             _logger.LogInformation("Syncing issues for {repo}", repoName);
-            var repo = await GetOrCreateRepoAsync(repoName);
+
+            var splat = repoName.Split('/');
+            if (splat.Length != 2)
+            {
+                throw new FormatException($"Invalid Repository Name: {repoName}");
+            }
+            var githubRepo = await _github.Repository.Get(splat[0].ToLowerInvariant(), splat[1].ToLowerInvariant());
+            var repo = await _syncTarget.GetOrCreateRepoAsync(githubRepo);
 
             // Get the sync history entry for this repo
-            var (success, syncTime) = await GetLastSyncTimeAsync(repo);
-            if (!success)
-            {
-                return false;
-            }
+            var syncRecord = await _syncTarget.GetLastSyncRecordAsync(repo);
+            var syncTime = syncRecord?.CreatedUtc ?? DateTime.MinValue;
 
             // Create the new sync history entry
-            var syncHistory = await RecordStartSync(repo);
+            var syncHistory = await _syncTarget.RecordStartSyncAsync(repo, _agent);
 
             try
             {
@@ -111,14 +101,14 @@ namespace HubSync
                 // Update sync history
                 syncHistory.Status = SyncStatus.Synchronized;
                 syncHistory.CompletedUtc = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
+                await _syncTarget.SaveChangesAsync();
             }
             catch (Exception ex)
             {
                 // Record the error
                 syncHistory.Error = ex.ToString();
                 syncHistory.Status = SyncStatus.Failed;
-                await _context.SaveChangesAsync();
+                await _syncTarget.SaveChangesAsync();
 
                 throw;
             }
@@ -135,7 +125,7 @@ namespace HubSync
 
             var stopwatch = Stopwatch.StartNew();
             _logger.LogInformation("Saving issues to database...");
-            await _context.SaveChangesAsync();
+            await _syncTarget.SaveChangesAsync();
             stopwatch.Stop();
             _logger.LogInformation("Saved {issueCount} issues in {elapsedMs:0.00}ms", issues.Count, stopwatch.ElapsedMilliseconds);
         }
@@ -392,31 +382,6 @@ namespace HubSync
             return user;
         }
 
-        private async Task<Repository> GetOrCreateRepoAsync(string fullName)
-        {
-            var splat = fullName.Split('/');
-            if (splat.Length != 2)
-            {
-                throw new FormatException($"Invalid Repository Name: {fullName}");
-            }
-            var (owner, name) = (splat[0].ToLowerInvariant(), splat[1].ToLowerInvariant());
-
-            var repo = await _context.Repositories
-                .FirstOrDefaultAsync(r => r.Owner == owner && r.Name == name);
-            if (repo == null)
-            {
-                var githubRepo = await _github.Repository.Get(owner, name);
-                repo = new Repository()
-                {
-                    GitHubId = githubRepo.Id,
-                    Owner = owner.ToLowerInvariant(),
-                    Name = name.ToLowerInvariant()
-                };
-                _context.Repositories.Add(repo);
-            }
-            return repo;
-        }
-
         private Octokit.RepositoryIssueRequest CreateIssueRequest(DateTime syncTime)
         {
             var request = new Octokit.RepositoryIssueRequest()
@@ -430,46 +395,6 @@ namespace HubSync
                 request.Since = new DateTimeOffset(syncTime, TimeSpan.Zero);
             }
             return request;
-        }
-
-        private async Task<SyncHistory> RecordStartSync(Repository repo)
-        {
-            var syncHistory = new SyncHistory()
-            {
-                CreatedUtc = DateTime.UtcNow,
-                RepositoryId = repo.Id,
-                Status = SyncStatus.Synchronizing,
-                Agent = _agent
-            };
-            _context.SyncHistory.Add(syncHistory);
-            await _context.SaveChangesAsync();
-            return syncHistory;
-        }
-
-        private async Task<(bool success, DateTime syncTime)> GetLastSyncTimeAsync(Repository repo)
-        {
-            // Find the last successful non-failed status.
-            var latest = await _context.SyncHistory
-                .Where(h => h.RepositoryId == repo.Id && h.Status != SyncStatus.Failed)
-                .OrderByDescending(h => h.CompletedUtc)
-                .FirstOrDefaultAsync();
-            if (latest != null && latest.Status != SyncStatus.Synchronized)
-            {
-                _logger.LogError("A synchronization is already underway by agent '{agent}'.", latest.Agent);
-                _logger.LogError("If you need to forcibly cancel it, run the 'cancel' command. This will NOT stop active processes attempting to synchronize it.");
-                return (false, DateTime.MinValue);
-            }
-            return (true, latest?.CreatedUtc ?? DateTime.MinValue);
-        }
-
-        private int PendingMigrationsError(IEnumerable<string> pendingMigrations)
-        {
-            _logger.LogError("Unable to continue, there are pending migrations.");
-            foreach (var migration in pendingMigrations)
-            {
-                _logger.LogError("Pending Migration: {migrationName}", migration);
-            }
-            return 1;
         }
     }
 }

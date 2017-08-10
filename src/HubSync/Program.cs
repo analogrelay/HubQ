@@ -16,7 +16,7 @@ namespace HubSync
 
         static int Main(string[] args)
         {
-            if(args.Any(a => a == "--debug"))
+            if (args.Any(a => a == "--debug"))
             {
                 args = args.Where(a => a != "--debug").ToArray();
                 Console.WriteLine($"Waiting for Debugger to attach. Process ID: {Process.GetCurrentProcess().Id}");
@@ -38,6 +38,7 @@ namespace HubSync
 
                 // Destination connection information
                 var sqlConnectionStringOption = cmd.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server database to sync issues to", CommandOptionType.SingleValue);
+                var mongoConnectionStringOption = cmd.Option("--mongo <CONNECTIONSTRING>", "A Connection String for a MongoDB server to sync issues to (supports Azure Cosmos DB)", CommandOptionType.SingleValue);
 
                 // Repositories to sync
                 var repositoryArgument = cmd.Argument("<REPOSITORIES...>", "Repositories to sync, in the form [owner]/[repo]", multipleValues: true);
@@ -51,12 +52,34 @@ namespace HubSync
                 {
                     // Validate arguments
                     var domain = Environment.UserDomainName ?? Environment.MachineName;
+
+                    var loggerFactory = loggingOptions.CreateLoggerFactory();
+
+                    // Determine the target
+                    SyncTarget target;
+                    if (sqlConnectionStringOption.HasValue() && mongoConnectionStringOption.HasValue())
+                    {
+                        throw new CommandLineException("Only one of '--mssql' or '--mongo' may be specified.");
+                    }
+                    else if (sqlConnectionStringOption.HasValue())
+                    {
+                        target = new SqlSyncTarget(sqlConnectionStringOption.Value(), loggerFactory);
+                    }
+                    else if (mongoConnectionStringOption.HasValue())
+                    {
+                        target = new MongoDbSyncTarget(mongoConnectionStringOption.Value(), loggerFactory);
+                    }
+                    else
+                    {
+                        throw new CommandLineException("One of '--mssql' or '--mongo' must be specified.")
+                    }
+
                     var command = new SyncCommand(
                             gitHubCredentials: new Credentials(GetRequiredOption(tokenOption)),
-                            sqlConnectionString: GetRequiredOption(sqlConnectionStringOption),
+                            syncTarget: target,
                             repositories: repositoryArgument.Values,
                             agent: GetOptionalOption(agentOption, $"{domain}\\{Environment.UserName} on {Environment.MachineName}, {process.ProcessName}:{process.Id}"),
-                            loggerFactory: loggingOptions.CreateLoggerFactory());
+                            loggerFactory: loggerFactory);
 
                     return command.ExecuteAsync();
                 });
