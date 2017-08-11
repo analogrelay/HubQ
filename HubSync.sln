@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26601.2
+VisualStudioVersion = 15.0.26801.0
 MinimumVisualStudioVersion = 15.0.26124.0
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{DFC04D51-FC26-4262-A967-CCB364BC16EC}"
 EndProject
@@ -10,6 +10,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		nuget.config = nuget.config
 	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "vendor", "vendor", "{C1D910A5-28E9-4004-BCAB-68DC834F6F60}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "octokit", "octokit", "{5ED3EDD2-C8A1-4432-9C24-5C1D112117DF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,5 +43,9 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{1B0EBF52-EA9C-4F65-AFBA-386EFBEC383D} = {DFC04D51-FC26-4262-A967-CCB364BC16EC}
+		{5ED3EDD2-C8A1-4432-9C24-5C1D112117DF} = {C1D910A5-28E9-4004-BCAB-68DC834F6F60}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {38456A1F-3181-468F-9980-756310216170}
 	EndGlobalSection
 EndGlobal
