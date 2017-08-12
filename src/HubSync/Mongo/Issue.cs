@@ -17,16 +17,16 @@ namespace HubSync.Mongo
         public string Title { get; set; }
         public IssueState State { get; set; }
         public string Body { get; set; }
-        public DateTimeOffset CreatedAt { get; set; }
-        public DateTimeOffset? ClosedAt { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public DateTime? ClosedAtUtc { get; set; }
         public int CommentCount { get; set; }
         public bool Locked { get; set; }
-        public DateTimeOffset? UpdatedAt { get; set; }
+        public DateTime? UpdatedAtUtc { get; set; }
         public User User { get; set; }
         public User ClosedBy { get; set; }
         public List<User> Assignees { get; set; } = new List<User>();
-        public List<Label> Labels { get; set; } = new List<Label>();
-        public Milestone Milestone { get; set; }
+        public List<IdRef> Labels { get; set; } = new List<IdRef>();
+        public IdRef Milestone { get; set; }
         public PullRequest PullRequest { get; set; }
         public Reactions Reactions { get; set; }
     }

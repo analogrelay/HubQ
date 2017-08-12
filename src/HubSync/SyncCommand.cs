@@ -154,7 +154,7 @@ namespace HubSync
 
         private async Task SyncIssuesAsync(Repository repo, DateTime? syncTime)
         {
-            _logger.LogInformation("Fetching issues for {repoOwner}/{repoName} changed since {syncTime} ...", repo.Owner.Login, repo.Name, syncTime == null ? "the beginning of time" : syncTime.ToString());
+            _logger.LogInformation("Fetching issues for {repoOwner}/{repoName} changed since {syncTime} ...", repo.Owner.Login, repo.Name, syncTime == DateTime.MinValue ? "the beginning of time" : syncTime.ToString());
             var issues = await _github.Issue.GetAllForRepository(repo.Id, CreateIssueRequest(syncTime), apiOptions);
             var apiInfo = _github.GetLastApiInfo();
             _logger.LogInformation("Fetched {issueCount} issues for {repoOwner}/{repoName}. Rate Limit remaining: {remainingRateLimit}", issues.Count, repo.Owner.Login, repo.Name, apiInfo.RateLimit.Remaining);
@@ -174,7 +174,7 @@ namespace HubSync
                 State = Octokit.ItemStateFilter.All
             };
 
-            if (syncTime != null)
+            if (syncTime != DateTime.MinValue)
             {
                 request.Since = new DateTimeOffset(syncTime.Value, TimeSpan.Zero);
             }

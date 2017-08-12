@@ -8,6 +8,7 @@ using HubSync.Models;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Driver;
 using Octokit;
 
@@ -46,6 +47,10 @@ namespace HubSync.Mongo
                 AssignIdOnInsert = true
             };
 
+            var conventions = new ConventionPack();
+            conventions.Add(new CamelCaseElementNameConvention());
+            ConventionRegistry.Register("HubSync", conventions, t => true);
+
             _issues = _database.GetCollection<Mongo.Issue>("issues", collectionSettings);
             _labels = _database.GetCollection<Mongo.Label>("labels", collectionSettings);
             _milestones = _database.GetCollection<Mongo.Milestone>("milestones", collectionSettings);
@@ -80,12 +85,12 @@ namespace HubSync.Mongo
                 State = githubIssue.State == ItemState.Open ? IssueState.Open : IssueState.Closed,
                 Body = githubIssue.Body,
                 User = CreateUser(githubIssue.User),
-                CreatedAt = githubIssue.CreatedAt,
+                CreatedAtUtc = githubIssue.CreatedAt.UtcDateTime,
                 ClosedBy = CreateUser(githubIssue.ClosedBy),
-                ClosedAt = githubIssue.ClosedAt,
+                ClosedAtUtc = githubIssue.ClosedAt?.UtcDateTime,
                 CommentCount = githubIssue.Comments,
                 Locked = githubIssue.Locked,
-                UpdatedAt = githubIssue.UpdatedAt,
+                UpdatedAtUtc = githubIssue.UpdatedAt?.UtcDateTime,
                 Assignees = githubIssue.Assignees.Select(CreateUser).ToList(),
                 PullRequest = CreatePullRequest(githubIssue.PullRequest),
                 Reactions = CreateReactions(githubIssue.Reactions),
@@ -100,33 +105,47 @@ namespace HubSync.Mongo
                 }
                 else
                 {
-                    issue.Labels.Add(label);
+                    issue.Labels.Add(new IdRef() { Ref = label.Id });
                 }
             }
 
-            var milestone = await GetMilestoneAsync(githubIssue.Milestone);
-            if (milestone == null)
+            if (githubIssue.Milestone != null)
             {
-                _logger.LogWarning("The milestone {milestoneTitle}, applied to {repoOwner}/{repoName}#{issueNumber} was applied mid-sync, a resync will be needed to update this.", githubIssue.Milestone.Title, repo.Owner, repo.Name, issue.Number);
-            }
-            else
-            {
-                issue.Milestone = milestone;
+                var milestone = await GetMilestoneAsync(githubIssue.Milestone);
+                if (milestone == null)
+                {
+                    _logger.LogWarning("The milestone {milestoneTitle}, applied to {repoOwner}/{repoName}#{issueNumber} was applied mid-sync, a resync will be needed to update this.", githubIssue.Milestone.Title, repo.Owner, repo.Name, issue.Number);
+                }
+                else
+                {
+                    issue.Milestone = new IdRef() { Ref = milestone.Id };
+                }
             }
 
-            _issuesToAdd.Add(new ReplaceOneModel<Mongo.Issue>(
+            var replace = new ReplaceOneModel<Mongo.Issue>(
                 filter.Eq(i => i.GitHubId, githubIssue.Id),
-                issue));
+                issue);
+            replace.IsUpsert = true;
+
+            _issuesToAdd.Add(replace);
         }
 
         private Mongo.PullRequest CreatePullRequest(Octokit.PullRequest pullRequest)
         {
-            throw new NotImplementedException();
+            return pullRequest == null ? null : new Mongo.PullRequest()
+            {
+                GitHubId = pullRequest.Id,
+                Url = pullRequest.Url,
+                Merged = pullRequest.Merged,
+                MergedAtUtc = pullRequest.MergedAt?.UtcDateTime,
+                MergedBy = CreateUser(pullRequest.MergedBy),
+                RequestedReviewers = pullRequest.RequestedReviewers.Select(CreateUser).ToList(),
+            };
         }
 
         private Mongo.Reactions CreateReactions(ReactionSummary reactions)
         {
-            return new Mongo.Reactions()
+            return reactions == null ? null : new Mongo.Reactions()
             {
                 Confused = reactions.Confused,
                 Heart = reactions.Heart,
@@ -140,7 +159,7 @@ namespace HubSync.Mongo
 
         private Mongo.User CreateUser(Octokit.User user)
         {
-            return new Mongo.User()
+            return user == null ? null : new Mongo.User()
             {
                 GitHubId = user.Id,
                 Login = user.Login,
@@ -174,6 +193,8 @@ namespace HubSync.Mongo
                     Builders<Repository>.Filter.Eq(r => r.Id, repo.Id),
                     repo);
             }
+
+            _repoCache[githubRepo.Id] = repo;
         }
 
         public override async Task SyncMilestoneAsync(Octokit.Repository githubRepo, Octokit.Milestone githubMilestone)
@@ -209,6 +230,8 @@ namespace HubSync.Mongo
                     Builders<Milestone>.Filter.Eq(r => r.Id, milestone.Id),
                     milestone);
             }
+
+            _milestoneCache[githubMilestone.Id] = milestone;
         }
 
         public override async Task SyncLabelAsync(Octokit.Repository githubRepo, Octokit.Label githubLabel)
@@ -244,6 +267,8 @@ namespace HubSync.Mongo
                     Builders<Label>.Filter.Eq(r => r.Id, label.Id),
                     label);
             }
+
+            _labelCache[githubLabel.Id] = label;
         }
 
         public override async Task RecordStartSyncAsync(Octokit.Repository githubRepo, string agent)
@@ -280,12 +305,31 @@ namespace HubSync.Mongo
                 throw new InvalidOperationException($"Can't call {nameof(CompleteSyncAsync)} unless {nameof(RecordStartSyncAsync)} has been called");
             }
 
-            // Bulk Write the pending issues
-            _logger.LogInformation("Bulk-writing {issueCount} issues", _issuesToAdd.Count);
-            var stopwatch = Stopwatch.StartNew();
-            await _issues.BulkWriteAsync(_issuesToAdd);
-            stopwatch.Stop();
-            _logger.LogInformation("Bulk-wrote {issueCount} issues in {elapsedMs:0.00}ms", _issuesToAdd.Count, stopwatch.ElapsedMilliseconds);
+            if (string.IsNullOrEmpty(error))
+            {
+                try
+                {
+                    // Bulk Write the pending issues
+                    if (_issuesToAdd.Count > 0)
+                    {
+                        _logger.LogInformation("Bulk-writing {issueCount} issues", _issuesToAdd.Count);
+                        var stopwatch = Stopwatch.StartNew();
+                        var result = await _issues.BulkWriteAsync(_issuesToAdd);
+                        stopwatch.Stop();
+                        _logger.LogInformation("Bulk-write of {count} issues complete in {elapsedMs:0.00}ms", result.RequestCount, stopwatch.ElapsedMilliseconds);
+                        _logger.LogInformation("Matched {matches} documents, inserted {inserts}, updated {updates}", result.MatchedCount, result.RequestCount - result.ModifiedCount, result.ModifiedCount);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("No issues to add!");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Record the error
+                    error = ex.ToString();
+                }
+            }
 
             _currentSync.CompletedUtc = DateTime.UtcNow;
             if (string.IsNullOrEmpty(error))
@@ -310,7 +354,7 @@ namespace HubSync.Mongo
             var repo = await GetRepositoryAsync(githubRepo);
 
             _logger.LogDebug("Fetching latest sync record for {owner}/{name}", repo.Owner, repo.Name);
-            var syncRecord = await _syncHistory.Find(r => r.Repository.Ref == repo.Id)
+            var syncRecord = await _syncHistory.Find(r => r.Repository.Ref == repo.Id && r.Status != SyncStatus.Failed)
                 .SortByDescending(r => r.CreatedUtc)
                 .FirstOrDefaultAsync();
 
@@ -324,28 +368,43 @@ namespace HubSync.Mongo
             return syncRecord?.CreatedUtc ?? DateTime.MinValue;
         }
 
-        private async Task<Mongo.Label> GetLabelAsync(Octokit.Label githubRepo)
+        private async Task<Mongo.Label> GetLabelAsync(Octokit.Label githubLabel)
         {
-            if (_labelCache.TryGetValue(githubRepo.Id, out var label))
+            if (githubLabel == null)
+            {
+                return null;
+            }
+
+            if (_labelCache.TryGetValue(githubLabel.Id, out var label))
             {
                 return label;
             }
 
-            return await _labels.Find(f => f.GitHubId == githubRepo.Id).FirstOrDefaultAsync();
+            return await _labels.Find(f => f.GitHubId == githubLabel.Id).FirstOrDefaultAsync();
         }
 
-        private async Task<Mongo.Milestone> GetMilestoneAsync(Octokit.Milestone githubRepo)
+        private async Task<Mongo.Milestone> GetMilestoneAsync(Octokit.Milestone githubMilestone)
         {
-            if (_milestoneCache.TryGetValue(githubRepo.Id, out var milestone))
+            if (githubMilestone == null)
+            {
+                return null;
+            }
+
+            if (_milestoneCache.TryGetValue(githubMilestone.Id, out var milestone))
             {
                 return milestone;
             }
 
-            return await _milestones.Find(f => f.GitHubId == githubRepo.Id).FirstOrDefaultAsync();
+            return await _milestones.Find(f => f.GitHubId == githubMilestone.Id).FirstOrDefaultAsync();
         }
 
         private async Task<Mongo.Repository> GetRepositoryAsync(Octokit.Repository githubRepo)
         {
+            if (githubRepo == null)
+            {
+                return null;
+            }
+
             if (_repoCache.TryGetValue(githubRepo.Id, out var repo))
             {
                 return repo;
