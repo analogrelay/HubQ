@@ -1,4 +1,4 @@
-namespace HubSync.Models.Sql
+namespace HubSync.Models
 {
     public enum IssueState
     {

@@ -4,43 +4,45 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using HubSync.Models;
-using HubSync.Models.Sql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Octokit;
 
-namespace HubSync
+namespace HubSync.Sql
 {
     public class SqlSyncTarget : SyncTarget
     {
-        private readonly Models.Sql.HubSyncContext _context;
+        private readonly Sql.HubSyncContext _context;
         private readonly ILogger<SqlSyncTarget> _logger;
 
-        private Dictionary<int, Models.Sql.User> _userCache = new Dictionary<int, Models.Sql.User>();
-        private Dictionary<Tuple<int, string>, Models.Sql.Label> _labelCache = new Dictionary<Tuple<int, string>, Models.Sql.Label>();
-        private Dictionary<Tuple<int, int>, Models.Sql.Milestone> _milestoneCache = new Dictionary<Tuple<int, int>, Models.Sql.Milestone>();
-        private Dictionary<Tuple<string, string>, Models.Sql.Repository> _repoCache = new Dictionary<Tuple<string, string>, Models.Sql.Repository>();
+        private Dictionary<long, Sql.User> _userCache = new Dictionary<long, Sql.User>();
+        private Dictionary<long, Sql.Label> _labelCache = new Dictionary<long, Sql.Label>();
+        private Dictionary<long, Sql.Milestone> _milestoneCache = new Dictionary<long, Sql.Milestone>();
+        private Dictionary<long, Sql.Repository> _repoCache = new Dictionary<long, Sql.Repository>();
 
         private SyncHistory _currentSync;
 
         public SqlSyncTarget(string sqlConnectionString, ILoggerFactory loggerFactory)
         {
+            throw new NotImplementedException("Broken right now, while working on Mongo");
+
             // Set up EF
-            var options = new DbContextOptionsBuilder<Models.Sql.HubSyncContext>()
+            var options = new DbContextOptionsBuilder<Sql.HubSyncContext>()
                 .EnableSensitiveDataLogging(true)
                 .UseLoggerFactory(loggerFactory)
                 .UseSqlServer(sqlConnectionString)
                 .Options;
-            _context = new Models.Sql.HubSyncContext(options);
+            _context = new Sql.HubSyncContext(options);
             _logger = loggerFactory.CreateLogger<SqlSyncTarget>();
         }
 
-        public override async Task<DateTime?> GetLastSyncTimeAsync(string owner, string name)
+        public override async Task<DateTime?> GetLastSyncTimeAsync(Octokit.Repository repo)
         {
-            var repo = await GetOrCreateRepoAsync(owner, name);
+            var repoModel = await GetOrCreateRepoAsync(repo);
 
             // Find the last successful non-failed status.
             var latest = await _context.SyncHistory
-                .Where(h => h.RepositoryId == repo.Id && h.Status != SyncStatus.Failed)
+                .Where(h => h.RepositoryId == repoModel.Id && h.Status != SyncStatus.Failed)
                 .OrderByDescending(h => h.CompletedUtc)
                 .FirstOrDefaultAsync();
             if (latest != null && latest.Status != SyncStatus.Synchronized)
@@ -71,19 +73,19 @@ namespace HubSync
             return true;
         }
 
-        public override async Task RecordStartSyncAsync(string owner, string name, string agent)
+        public override async Task RecordStartSyncAsync(Octokit.Repository repo, string agent)
         {
             if (_currentSync != null)
             {
                 throw new InvalidOperationException($"Can't call {nameof(RecordStartSyncAsync)} twice.");
             }
 
-            var repo = await GetOrCreateRepoAsync(owner, name);
+            var repoModel = await GetOrCreateRepoAsync(repo);
 
-            var syncHistory = new Models.Sql.SyncHistory()
+            var syncHistory = new Sql.SyncHistory()
             {
                 CreatedUtc = DateTime.UtcNow,
-                RepositoryId = repo.Id,
+                RepositoryId = repoModel.Id,
                 Status = SyncStatus.Synchronizing,
                 Agent = agent
             };
@@ -112,29 +114,30 @@ namespace HubSync
             await _context.SaveChangesAsync();
         }
 
-        public override async Task SyncIssueAsync(Octokit.Issue issue)
+        public override async Task SyncIssueAsync(Octokit.Repository repo, Octokit.Issue issue)
         {
-            var repo = await GetOrCreateRepoAsync(issue.Repository.Owner.Location, issue.Repository.Name);
-
             var stopwatch = Stopwatch.StartNew();
 
             // Check if we need to create a new issue
             var issueModel = await _context.Issues
                 .Include(i => i.Assignees).ThenInclude(a => a.User)
                 .Include(i => i.Labels).ThenInclude(l => l.Label)
-                .FirstOrDefaultAsync(i => i.RepositoryId == repo.Id && i.Number == issue.Number);
+                .FirstOrDefaultAsync(i => i.GitHubId == issue.Id);
             var newIssue = false;
+
             if (issueModel == null)
             {
+                var repoModel = await GetOrCreateRepoAsync(repo);
                 issueModel = new Issue()
                 {
-                    RepositoryId = repo.Id
+                    RepositoryId = repoModel.Id
                 };
                 newIssue = true;
             }
 
             issueModel.PullRequest = await CreatePullRequestAsync(issue.PullRequest);
 
+            issueModel.GitHubId = issue.Id;
             issueModel.Body = issue.Body;
             issueModel.ClosedAt = issue.ClosedAt;
             issueModel.CommentCount = issue.Comments;
@@ -143,7 +146,6 @@ namespace HubSync
             issueModel.HtmlUrl = issue.HtmlUrl.ToString();
             issueModel.Locked = issue.Locked;
             issueModel.Number = issue.Number;
-            issueModel.RepositoryId = repo.Id;
             issueModel.State = issue.State == Octokit.ItemState.Open ? IssueState.Open : IssueState.Closed;
             issueModel.Title = issue.Title;
             issueModel.UpdatedAt = issue.UpdatedAt;
@@ -151,7 +153,7 @@ namespace HubSync
 
             if (issue.Milestone != null)
             {
-                issueModel.Milestone = await GetOrCreateMilestoneAsync(issue.Milestone, repo.Id);
+                issueModel.Milestone = await GetOrCreateMilestoneAsync(repo, issue.Milestone);
             }
 
             if (issue.ClosedBy != null)
@@ -190,7 +192,7 @@ namespace HubSync
                 },
                 createItem: async l => new IssueLabel()
                 {
-                    Label = await GetOrCreateLabelAsync(l, repo.Id)
+                    Label = await GetOrCreateLabelAsync(repo, l)
                 });
 
             if (newIssue)
@@ -202,24 +204,31 @@ namespace HubSync
             _logger.LogTrace((newIssue ? "Added" : "Updated") + " issue #{number} - {title} in {elapsedMs:0.00}ms", issue.Number, issue.Title, stopwatch.ElapsedMilliseconds);
         }
 
-        private async Task<Repository> GetOrCreateRepoAsync(string owner, string name)
+        public override Task SyncRepositoryAsync(Octokit.Repository repo) => GetOrCreateRepoAsync(repo);
+
+        public override Task SyncMilestoneAsync(Octokit.Repository repo, Octokit.Milestone milestone) => GetOrCreateMilestoneAsync(repo, milestone);
+
+        public override Task SyncLabelAsync(Octokit.Repository repo, Octokit.Label label) => GetOrCreateLabelAsync(repo, label);
+
+        private async Task<Repository> GetOrCreateRepoAsync(Octokit.Repository githubRepo)
         {
-            if (!_repoCache.TryGetValue(Tuple.Create(owner, name), out var repo))
+            if (!_repoCache.TryGetValue(githubRepo.Id, out var repo))
             {
                 repo = await _context.Repositories
-                    .FirstOrDefaultAsync(r => r.Owner == owner && r.Name == name);
+                    .FirstOrDefaultAsync(r => r.GitHubId == githubRepo.Id);
 
                 if (repo == null)
                 {
                     repo = new Repository()
                     {
-                        Owner = owner.ToLowerInvariant(),
-                        Name = name.ToLowerInvariant()
+                        GitHubId = githubRepo.Id,
+                        Owner = githubRepo.Owner.Login,
+                        Name = githubRepo.Name
                     };
                     _context.Repositories.Add(repo);
                 }
 
-                _repoCache[Tuple.Create(owner, name)] = repo;
+                _repoCache[githubRepo.Id] = repo;
             }
             return repo;
         }
@@ -316,51 +325,57 @@ namespace HubSync
             }
         }
 
-        private async Task<Label> GetOrCreateLabelAsync(Octokit.Label githubLabel, int repoId)
+        private async Task<Label> GetOrCreateLabelAsync(Octokit.Repository githubRepo, Octokit.Label githubLabel)
         {
-            if (_labelCache.TryGetValue(Tuple.Create(repoId, githubLabel.Name), out var label))
+            if (_labelCache.TryGetValue(githubLabel.Id, out var label))
             {
                 return label;
             }
 
             label = await _context.Labels
-                .FirstOrDefaultAsync(l => l.RepositoryId == repoId && l.Name == githubLabel.Name);
+                .FirstOrDefaultAsync(l => l.GitHubId == githubLabel.Id);
             if (label == null)
             {
+                var repo = await GetOrCreateRepoAsync(githubRepo);
+
                 label = new Label()
                 {
-                    RepositoryId = repoId,
+                    RepositoryId = repo.Id,
+                    GitHubId = githubLabel.Id,
                     Name = githubLabel.Name,
                     Color = githubLabel.Color
                 };
                 _context.Labels.Add(label);
             }
 
-            _labelCache[Tuple.Create(repoId, label.Name)] = label;
+            _labelCache[githubLabel.Id] = label;
             return label;
         }
 
-        private async Task<Milestone> GetOrCreateMilestoneAsync(Octokit.Milestone githubMilestone, int repoId)
+        private async Task<Milestone> GetOrCreateMilestoneAsync(Octokit.Repository githubRepo, Octokit.Milestone githubMilestone)
         {
-            if (_milestoneCache.TryGetValue(Tuple.Create(repoId, githubMilestone.Number), out var milestone))
+            if (_milestoneCache.TryGetValue(githubMilestone.Id, out var milestone))
             {
                 return milestone;
             }
 
             milestone = await _context.Milestones
-                .FirstOrDefaultAsync(m => m.RepositoryId == repoId && m.Number == githubMilestone.Number);
+                .FirstOrDefaultAsync(m => m.GitHubId == githubMilestone.Id);
             if (milestone == null)
             {
+                var repo = await GetOrCreateRepoAsync(githubRepo);
+
                 milestone = new Milestone()
                 {
-                    RepositoryId = repoId,
+                    RepositoryId = repo.Id,
+                    GitHubId = milestone.Id,
                     Number = githubMilestone.Number,
                     Title = githubMilestone.Title
                 };
                 _context.Milestones.Add(milestone);
             }
 
-            _milestoneCache[Tuple.Create(repoId, milestone.Number)] = milestone;
+            _milestoneCache[githubMilestone.Id] = milestone;
             return milestone;
         }
 

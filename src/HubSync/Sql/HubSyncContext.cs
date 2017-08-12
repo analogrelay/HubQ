@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
-namespace HubSync.Models.Sql
+namespace HubSync.Sql
 {
     public class HubSyncContext : DbContext
     {

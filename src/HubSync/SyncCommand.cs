@@ -19,6 +19,11 @@ namespace HubSync
         private readonly ILogger<SyncCommand> _logger;
         private readonly IGitHubClient _github;
 
+        private readonly ApiOptions apiOptions = new ApiOptions()
+        {
+            PageSize = 100
+        };
+
         public SyncCommand(Octokit.Credentials gitHubCredentials, SyncTarget syncTarget, IReadOnlyList<string> repositories, string agent, ILoggerFactory loggerFactory)
         {
             _syncTarget = syncTarget;
@@ -75,7 +80,13 @@ namespace HubSync
             }
             var owner = splat[0];
             var name = splat[1];
-            var syncTime = await _syncTarget.GetLastSyncTimeAsync(owner, name);
+            var repo = await _github.Repository.Get(owner, name);
+
+            // Ensure the repository is synced
+            await _syncTarget.SyncRepositoryAsync(repo);
+
+            // Get the last sync time for issues
+            var syncTime = await _syncTarget.GetLastSyncTimeAsync(repo);
             if (syncTime == null)
             {
                 // Cancel, because a sync is already in progress
@@ -83,32 +94,23 @@ namespace HubSync
             }
 
             // Create the new sync history entry
-            await _syncTarget.RecordStartSyncAsync(owner, name, _agent);
+            await _syncTarget.RecordStartSyncAsync(repo, _agent);
 
             try
             {
-                // Fetch the data
-                var apiOptions = new ApiOptions()
-                {
-                    PageSize = 100
-                };
+                // Sync Labels and Milestones first
+                await SyncLabelsAsync(repo);
+                await SyncMilestonesAsync(repo);
 
-                var issues = await _github.Issue.GetAllForRepository(owner, name, CreateIssueRequest(syncTime.Value), apiOptions);
-
-                // Grab API info (for rate limit impact)
-                var apiInfo = _github.GetLastApiInfo();
-                _logger.LogInformation("Fetched {issueCount} issues for '{repo}'. Rate Limit remaining: {remainingRateLimit}", issues.Count, $"{owner}/{name}", apiInfo.RateLimit.Remaining);
-
-                await IngestIssuesAsync(issues);
-
-                _logger.LogInformation("Synced {issueCount} issues.", issues.Count);
+                // Sync Issues changed since the last sync
+                await SyncIssuesAsync(repo, syncTime.Value);
 
                 // Update sync history
                 var stopwatch = Stopwatch.StartNew();
                 _logger.LogInformation("Saving issues to database...");
                 await _syncTarget.CompleteSyncAsync(error: null);
                 stopwatch.Stop();
-                _logger.LogInformation("Saved {issueCount} issues in {elapsedMs:0.00}ms", issues.Count, stopwatch.ElapsedMilliseconds);
+                _logger.LogInformation("Saved issues in {elapsedMs:0.00}ms", stopwatch.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
@@ -120,25 +122,61 @@ namespace HubSync
             return true;
         }
 
-        private async Task IngestIssuesAsync(IReadOnlyList<Issue> issues)
+        private async Task SyncMilestonesAsync(Repository repo)
         {
-            foreach (var issue in issues)
+            _logger.LogInformation("Fetching milestones for {repoOwner}/{repoName} ...", repo.Owner.Login, repo.Name);
+            var milestones = await _github.Issue.Milestone.GetAllForRepository(repo.Id);
+            var apiInfo = _github.GetLastApiInfo();
+            _logger.LogInformation("Fetched {count} milestones for {repoOwner}/{repoName}. Rate Limit remaining: {remainingRateLimit}", milestones.Count, repo.Owner.Login, repo.Name, apiInfo.RateLimit.Remaining);
+
+            foreach (var milestone in milestones)
             {
-                await _syncTarget.SyncIssueAsync(issue);
+                await _syncTarget.SyncMilestoneAsync(repo, milestone);
             }
+
+            _logger.LogInformation("Synced {count} milestones.", milestones.Count);
         }
 
-        private RepositoryIssueRequest CreateIssueRequest(DateTime syncTime)
+        private async Task SyncLabelsAsync(Repository repo)
+        {
+            _logger.LogInformation("Fetching labels for {repoOwner}/{repoName} ...", repo.Owner.Login, repo.Name);
+            var labels = await _github.Issue.Labels.GetAllForRepository(repo.Id);
+            var apiInfo = _github.GetLastApiInfo();
+            _logger.LogInformation("Fetched {count} labels for {repoOwner}/{repoName}. Rate Limit remaining: {remainingRateLimit}", labels.Count, repo.Owner.Login, repo.Name, apiInfo.RateLimit.Remaining);
+
+            foreach (var label in labels)
+            {
+                await _syncTarget.SyncLabelAsync(repo, label);
+            }
+
+            _logger.LogInformation("Synced {count} labels.", labels.Count);
+        }
+
+        private async Task SyncIssuesAsync(Repository repo, DateTime? syncTime)
+        {
+            _logger.LogInformation("Fetching issues for {repoOwner}/{repoName} changed since {syncTime} ...", repo.Owner.Login, repo.Name, syncTime == null ? "the beginning of time" : syncTime.ToString());
+            var issues = await _github.Issue.GetAllForRepository(repo.Id, CreateIssueRequest(syncTime), apiOptions);
+            var apiInfo = _github.GetLastApiInfo();
+            _logger.LogInformation("Fetched {issueCount} issues for {repoOwner}/{repoName}. Rate Limit remaining: {remainingRateLimit}", issues.Count, repo.Owner.Login, repo.Name, apiInfo.RateLimit.Remaining);
+
+            foreach (var issue in issues)
+            {
+                await _syncTarget.SyncIssueAsync(repo, issue);
+            }
+
+            _logger.LogInformation("Synced {count} issues.", issues.Count);
+        }
+
+        private RepositoryIssueRequest CreateIssueRequest(DateTime? syncTime)
         {
             var request = new RepositoryIssueRequest()
             {
                 State = Octokit.ItemStateFilter.All
             };
 
-            if (syncTime != DateTime.MinValue)
+            if (syncTime != null)
             {
-                _logger.LogInformation("Last sync was at {syncTime}. Fetching changes since then.", syncTime.ToLocalTime());
-                request.Since = new DateTimeOffset(syncTime, TimeSpan.Zero);
+                request.Since = new DateTimeOffset(syncTime.Value, TimeSpan.Zero);
             }
             return request;
         }

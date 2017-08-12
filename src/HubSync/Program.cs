@@ -2,6 +2,8 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using HubSync.Mongo;
+using HubSync.Sql;
 using Microsoft.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Logging;
 using Octokit;
@@ -71,7 +73,7 @@ namespace HubSync
                     }
                     else
                     {
-                        throw new CommandLineException("One of '--mssql' or '--mongo' must be specified.")
+                        throw new CommandLineException("One of '--mssql' or '--mongo' must be specified.");
                     }
 
                     var command = new SyncCommand(
