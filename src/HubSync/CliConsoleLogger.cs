@@ -43,40 +43,42 @@ namespace HubSync
 
             lock (_consoleLock)
             {
-                var (prefix, fg, bg) = GetLogLevelInfo(logLevel);
+                var (prefix, levelFg, textFg, bg) = GetLogLevelInfo(logLevel);
 
                 var oldFg = Console.ForegroundColor;
                 var oldBg = Console.BackgroundColor;
-                Console.ForegroundColor = fg;
+                Console.ForegroundColor = levelFg;
                 Console.BackgroundColor = bg;
 
                 Console.Write(prefix);
 
-                Console.ForegroundColor = oldFg;
+                Console.ForegroundColor = textFg ?? oldFg;
                 Console.BackgroundColor = oldBg;
 
                 Console.WriteLine($": {message}");
+
+                Console.ForegroundColor = oldFg;
             }
         }
 
-        private (string prefix, ConsoleColor foreground, ConsoleColor background) GetLogLevelInfo(LogLevel logLevel)
+        private (string prefix, ConsoleColor levelForeground, ConsoleColor? textForeground, ConsoleColor background) GetLogLevelInfo(LogLevel logLevel)
         {
             // We must explicitly set the background color if we are setting the foreground color,
             // since just setting one can look bad on the users console.
             switch (logLevel)
             {
                 case LogLevel.Critical:
-                    return ("crit", ConsoleColor.White, ConsoleColor.Red);
+                    return ("crit", ConsoleColor.White, null, ConsoleColor.Red);
                 case LogLevel.Error:
-                    return ("fail", ConsoleColor.Black, ConsoleColor.Red);
+                    return ("fail", ConsoleColor.Black, null, ConsoleColor.Red);
                 case LogLevel.Warning:
-                    return ("warn", ConsoleColor.Yellow, ConsoleColor.Black);
+                    return ("warn", ConsoleColor.Yellow, null, ConsoleColor.Black);
                 case LogLevel.Information:
-                    return ("info", ConsoleColor.DarkGreen, ConsoleColor.Black);
+                    return ("info", ConsoleColor.DarkGreen, null, ConsoleColor.Black);
                 case LogLevel.Debug:
-                    return ("dbug", ConsoleColor.Gray, ConsoleColor.Black);
+                    return ("dbug", ConsoleColor.Magenta, ConsoleColor.DarkGray, ConsoleColor.Black);
                 case LogLevel.Trace:
-                    return ("trce", ConsoleColor.Gray, ConsoleColor.Black);
+                    return ("trce", ConsoleColor.Gray, ConsoleColor.DarkGray, ConsoleColor.Black);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(logLevel));
             }

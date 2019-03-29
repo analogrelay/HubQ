@@ -1,53 +1,63 @@
 using System;
-using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
-using System.Threading.Tasks;
-using Microsoft.Extensions.CommandLineUtils;
+using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace HubSync
 {
+    [Command("hubsync", Description = "GitHub Issue Synchronizer")]
+    [Subcommand(typeof(InitCommand))]
+    [Subcommand(typeof(UpdateCommand))]
+    [Subcommand(typeof(SyncCommand))]
     class Program
     {
+        private enum Verbosity
+        {
+            Normal,
+            Verbose,
+            VeryVerbose
+        }
+
         private static readonly Assembly Asm = typeof(Program).Assembly;
-        private static readonly string Version = Asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        private static readonly string Name = Asm.GetName().Name;
+        public static readonly string Version = Asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        public static readonly string Name = Asm.GetName().Name;
 
         static int Main(string[] args)
         {
-            var app = new CommandLineApplication();
-            app.Name = Name;
-            app.FullName = "HubSync - GitHub Issue Synchronizer";
-            app.VersionOption("-v|--version", Version);
-
-            app.Command("sync", cmd =>
+#if DEBUG
+            if (args.Any(a => a == "--debug"))
             {
-                // GitHub connection information
-                var userNameOption = cmd.Option("-u|--username <USERNAME>", "The GitHub username to use to authenticate", CommandOptionType.SingleValue);
-                var tokenOption = cmd.Option("-t|--token <TOKEN>", "The GitHub OAuth Token to use to authenticate", CommandOptionType.SingleValue);
+                args = args.Where(a => a != "--debug").ToArray();
+                Console.WriteLine($"Ready for debugger to attach. Process ID: {Process.GetCurrentProcess().Id}.");
+                Console.WriteLine("Press ENTER to continue.");
+                Console.ReadLine();
+            }
+#endif
 
-                // Destination connection information
-                var sqlConnectionStringOption = cmd.Option("--mssql <CONNECTIONSTRING>", "A Connection String for a Microsoft SQL Server to sync issues to", CommandOptionType.SingleValue);
+            // Verbose global argument
+            var verbose = Verbosity.Normal;
+            if (args.Any(a => a == "-vv" || a == "--very-verbose"))
+            {
+                verbose = Verbosity.VeryVerbose;
+                args = args.Where(a => a != "-vv" && a != "--very-verbose").ToArray();
+            }
+            else if (args.Any(a => a == "-v" || a == "--verbose"))
+            {
+                verbose = Verbosity.Verbose;
+                args = args.Where(a => a != "-v" && a != "--verbose").ToArray();
+            }
 
-                // Repositories to sync
-                var repositoryArgument = cmd.Argument("<REPOSITORIES...>", "Repositories to sync, in the form [owner]/[repo]", multipleValues: true);
+            var app = new CommandLineApplication<Program>();
+            var services = new ServiceCollection();
+            ConfigureServices(services, verbose);
+            app.Conventions
+                .UseDefaultConventions()
+                .UseConstructorInjection(services.BuildServiceProvider());
 
-                // Logging options
-                var verboseOption = cmd.Option("-v|--verbose", "Be verbose", CommandOptionType.NoValue);
-
-                cmd.OnExecute(() =>
-                {
-                    // Validate arguments
-                    var command = new SyncCommand(
-                            userName: GetRequiredOption(userNameOption),
-                            token: GetRequiredOption(tokenOption),
-                            sqlConnectionString: GetRequiredOption(sqlConnectionStringOption),
-                            repositories: repositoryArgument.Values,
-                            loggerFactory: CreateLogger(verboseOption.HasValue()));
-
-                    return command.ExecuteAsync();
-                });
-            });
+            app.VersionOption("-v|--version", Version);
 
             try
             {
@@ -55,36 +65,39 @@ namespace HubSync
             }
             catch (CommandLineException clex)
             {
-                app.ShowHelp();
-
-                var oldForeground = Console.ForegroundColor;
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.Write("error");
-                Console.ForegroundColor = oldForeground;
-                Console.WriteLine($": {clex.Message}");
+                Console.Error.WriteLine(clex.Message);
                 return 1;
             }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Unhandled exception:");
+                Console.Error.WriteLine(ex.ToString());
+                return 1;
+            }
+
         }
 
-        private static ILoggerFactory CreateLogger(bool verbose)
+        public void OnExecute(CommandLineApplication app)
         {
-            var factory = new LoggerFactory();
-            factory.AddProvider("Console", new CliConsoleLoggerProvider());
-            if (!verbose)
-            {
-                factory.AddFilter((_, __, level) => level >= LogLevel.Information);
-            }
-            return factory;
+            Console.WriteLine("Default");
+            app.ShowHelp();
         }
 
-        private static string GetRequiredOption(CommandOption option)
+        private static void ConfigureServices(IServiceCollection services, Verbosity verbose)
         {
-            // Exceptions as control-flow. Yaaaay!
-            if (!option.HasValue())
+            services.AddLogging(builder =>
             {
-                throw new CommandLineException($"Missing required argument '--{option.LongName}'.");
-            }
-            return option.Value();
+                builder.AddProvider(new CliConsoleLoggerProvider());
+
+                if (verbose != Verbosity.Normal)
+                {
+                    builder.SetMinimumLevel(LogLevel.Debug);
+                    if (verbose != Verbosity.VeryVerbose)
+                    {
+                        builder.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Information);
+                    }
+                }
+            });
         }
     }
 }
