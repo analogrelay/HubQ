@@ -9,6 +9,7 @@ namespace HubSync.Models
         public string? AvatarUrl { get; set;}
 
         public virtual IList<Issue>? Issues { get; set; }
+        public virtual IList<IssueAssignee>? IssueAssignments { get; set; }
 
         public void UpdateFrom(Octokit.User user)
         {

@@ -10,6 +10,8 @@ namespace HubSync.Models
 
         public virtual IList<SyncLogEntry>? LogEntries { get; set; }
         public virtual IList<Issue>? Issues { get; set; }
+        public virtual IList<Label>? Labels { get; set; }
+        public virtual IList<Milestone>? Milestones { get; set; }
 
         public void UpdateFrom(Octokit.Repository repo)
         {

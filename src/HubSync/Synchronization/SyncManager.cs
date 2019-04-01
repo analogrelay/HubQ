@@ -87,7 +87,10 @@ namespace HubSync.Synchronization
             }
             else
             {
-                model = await Db.Issues.FirstOrDefaultAsync(i => i.GitHubId == issue.Id);
+                model = await Db.Issues
+                    .Include(i => i.Assignees)
+                    .Include(i => i.Labels)
+                    .FirstOrDefaultAsync(i => i.GitHubId == issue.Id);
                 if (model == null)
                 {
                     _logger.LogTrace("Synchronizing new issue {Owner}/{Name}#{Number}.", repo.Owner, repo.Name, issue.Number);
@@ -102,6 +105,22 @@ namespace HubSync.Synchronization
             var author = await SyncActorAsync(issue.User);
             model.Author = author;
             model.Repository = repo;
+
+            // Update assignees
+            foreach(var assignee in issue.Assignees)
+            {
+                var actor = await SyncActorAsync(assignee);
+                if(!model.Assignees.Any(a => a.AssigneeId == actor.Id))
+                {
+                    var issueAssignee = new IssueAssignee()
+                    {
+                        Issue = model,
+                        Assignee = actor
+                    };
+                    Db.IssueAssignees.Add(issueAssignee);
+                    model.Assignees!.Add(issueAssignee);
+                }
+            }
 
             _issueCache[model.GitHubId] = model;
             return model;

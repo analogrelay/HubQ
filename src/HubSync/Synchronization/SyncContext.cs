@@ -41,7 +41,9 @@ namespace HubSync.Synchronization
                 _manager.GitHub,
                 new Uri($"https://api.github.com/repos/{Repo.Owner}/{Repo.Name}/issues"),
                 parameters,
-                AcceptHeaders.GitHubAppsPreview);
+                AcceptHeaders.Concat(
+                    AcceptHeaders.GitHubAppsPreview,
+                    AcceptHeaders.ReactionsPreview));
         }
     }
 }

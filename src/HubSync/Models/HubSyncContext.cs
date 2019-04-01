@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Octokit;
 
 namespace HubSync.Models
 {
@@ -9,6 +11,7 @@ namespace HubSync.Models
         public DbSet<Repository> Repositories { get; set; } = null!;
         public DbSet<Issue> Issues { get; set; } = null!;
         public DbSet<Actor> Actors { get; set; } = null!;
+        public DbSet<IssueAssignee> IssueAssignees { get; set; } = null!;
 
         public HubSyncContext(DbContextOptions options) : base(options)
         {
@@ -29,7 +32,8 @@ namespace HubSync.Models
                 syncLog
                     .HasOne(e => e.Repository)
                     .WithMany(r => r!.LogEntries)
-                    .HasForeignKey(e => e.RepositoryId);
+                    .HasForeignKey(e => e.RepositoryId)
+                    .IsRequired();
 
                 syncLog.ToTable("SyncLog");
             });
@@ -53,13 +57,91 @@ namespace HubSync.Models
                 issue
                     .HasOne(i => i.Repository)
                     .WithMany(r => r!.Issues)
-                    .HasForeignKey(i => i.RepositoryId);
+                    .HasForeignKey(i => i.RepositoryId)
+                    .IsRequired();
 
                 issue
                     .HasOne(i => i.Author)
                     .WithMany(a => a!.Issues)
-                    .HasForeignKey(i => i.AuthorId);
+                    .HasForeignKey(i => i.AuthorId)
+                    .IsRequired();
+
+                issue.Property(i => i.Body).IsRequired();
+                issue.Property(i => i.Title).IsRequired();
+                issue.Property(i => i.State).HasConversion(new EnumToStringConverter<ItemState>());
+
+                issue
+                    .HasOne(i => i.Milestone)
+                    .WithMany(m => m!.Issues)
+                    .HasForeignKey(i => i.MilestoneId)
+                    .IsRequired(required: false);
+
+                issue.OwnsOne(i => i.Reactions)
+                    .WithOwner();
+            });
+
+            modelBuilder.Entity<IssueAssignee>(issueAssignee =>
+            {
+                issueAssignee.HasKey(i => new { i.IssueId, i.AssigneeId });
+
+                issueAssignee
+                    .HasOne(i => i.Issue)
+                    .WithMany(i => i!.Assignees)
+                    .HasForeignKey(i => i.IssueId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+
+                issueAssignee
+                    .HasOne(i => i.Assignee)
+                    .WithMany(a => a!.IssueAssignments)
+                    .HasForeignKey(i => i.AssigneeId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+            });
+
+            modelBuilder.Entity<Label>(label =>
+            {
+                label.Property(l => l.RepositoryId).IsRequired();
+                label.Property(l => l.Name).IsRequired();
+
+                label
+                    .HasOne(l => l.Repository)
+                    .WithMany(r => r!.Labels)
+                    .HasForeignKey(l => l.RepositoryId)
+                    .IsRequired();
+            });
+
+            modelBuilder.Entity<Milestone>(milestone =>
+            {
+                milestone.Property(m => m.RepositoryId).IsRequired();
+                milestone.Property(m => m.Title).IsRequired();
+                milestone.Property(i => i.State).HasConversion(new EnumToStringConverter<ItemState>());
+
+                milestone
+                    .HasOne(m => m.Repository)
+                    .WithMany(r => r!.Milestones)
+                    .HasForeignKey(m => m.RepositoryId)
+                    .IsRequired();
+            });
+
+            modelBuilder.Entity<IssueLabel>(issueLabel =>
+            {
+                issueLabel.HasKey(i => new { i.IssueId, i.LabelId });
+
+                issueLabel
+                    .HasOne(i => i.Issue)
+                    .WithMany(i => i!.Labels)
+                    .HasForeignKey(i => i.IssueId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+
+                issueLabel
+                    .HasOne(i => i.Label)
+                    .WithMany(a => a!.Issues)
+                    .HasForeignKey(i => i.LabelId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
             });
         }
-    }
+}
 }
