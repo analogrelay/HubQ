@@ -115,7 +115,7 @@ namespace HubSync.Migrations
 
                     b.HasIndex("LabelId");
 
-                    b.ToTable("IssueLabel");
+                    b.ToTable("IssueLabels");
                 });
 
             modelBuilder.Entity("HubSync.Models.Label", b =>
@@ -139,7 +139,7 @@ namespace HubSync.Migrations
 
                     b.HasIndex("RepositoryId");
 
-                    b.ToTable("Label");
+                    b.ToTable("Labels");
                 });
 
             modelBuilder.Entity("HubSync.Models.Milestone", b =>
@@ -166,7 +166,7 @@ namespace HubSync.Migrations
 
                     b.HasIndex("RepositoryId");
 
-                    b.ToTable("Milestone");
+                    b.ToTable("Milestones");
                 });
 
             modelBuilder.Entity("HubSync.Models.Repository", b =>

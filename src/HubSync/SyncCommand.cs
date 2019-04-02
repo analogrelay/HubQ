@@ -120,9 +120,26 @@ namespace HubSync
                 await syncManager.SaveChangesAsync();
                 stopwatch.Stop();
                 _logger.LogInformation("Synced {Count} issues in {Elapsed}ms.", issuePage.Count, stopwatch.ElapsedMilliseconds);
+                _logger.LogDebug("Current memory usage {FormattedMemoryUsage}", FormatSize(GC.GetTotalMemory(forceFullCollection: false)));
             }
 
             return true;
+        }
+
+        private string FormatSize(long bytes)
+        {
+            if(bytes / 1024 < 5)
+            {
+                return $"{bytes} bytes";
+            }
+            else if (bytes / 1024 / 1024 < 5)
+            {
+                return $"{((double)bytes) / 1024}KB";
+            }
+            else
+            {
+                return $"{((double)bytes) / 1024 / 1024}MB";
+            }
         }
     }
 }

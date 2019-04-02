@@ -58,6 +58,11 @@ namespace HubSync
                 Console.WriteLine($": {message}");
 
                 Console.ForegroundColor = oldFg;
+
+                if (exception != null)
+                {
+                    Console.WriteLine(exception.ToString());
+                }
             }
         }
 

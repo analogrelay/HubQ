@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HubSync.Migrations
 {
     [DbContext(typeof(HubSyncContext))]
-    [Migration("20190401164101_Initial")]
+    [Migration("20190402001844_Initial")]
     partial class Initial
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -117,7 +117,7 @@ namespace HubSync.Migrations
 
                     b.HasIndex("LabelId");
 
-                    b.ToTable("IssueLabel");
+                    b.ToTable("IssueLabels");
                 });
 
             modelBuilder.Entity("HubSync.Models.Label", b =>
@@ -141,7 +141,7 @@ namespace HubSync.Migrations
 
                     b.HasIndex("RepositoryId");
 
-                    b.ToTable("Label");
+                    b.ToTable("Labels");
                 });
 
             modelBuilder.Entity("HubSync.Models.Milestone", b =>
@@ -168,7 +168,7 @@ namespace HubSync.Migrations
 
                     b.HasIndex("RepositoryId");
 
-                    b.ToTable("Milestone");
+                    b.ToTable("Milestones");
                 });
 
             modelBuilder.Entity("HubSync.Models.Repository", b =>

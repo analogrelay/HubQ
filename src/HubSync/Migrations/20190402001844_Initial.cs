@@ -41,7 +41,7 @@ namespace HubSync.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Label",
+                name: "Labels",
                 columns: table => new
                 {
                     Id = table.Column<int>(nullable: false)
@@ -54,9 +54,9 @@ namespace HubSync.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Label", x => x.Id);
+                    table.PrimaryKey("PK_Labels", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Label_Repositories_RepositoryId",
+                        name: "FK_Labels_Repositories_RepositoryId",
                         column: x => x.RepositoryId,
                         principalTable: "Repositories",
                         principalColumn: "Id",
@@ -64,7 +64,7 @@ namespace HubSync.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Milestone",
+                name: "Milestones",
                 columns: table => new
                 {
                     Id = table.Column<int>(nullable: false)
@@ -78,9 +78,9 @@ namespace HubSync.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Milestone", x => x.Id);
+                    table.PrimaryKey("PK_Milestones", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Milestone_Repositories_RepositoryId",
+                        name: "FK_Milestones_Repositories_RepositoryId",
                         column: x => x.RepositoryId,
                         principalTable: "Repositories",
                         principalColumn: "Id",
@@ -148,9 +148,9 @@ namespace HubSync.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_Issues_Milestone_MilestoneId",
+                        name: "FK_Issues_Milestones_MilestoneId",
                         column: x => x.MilestoneId,
-                        principalTable: "Milestone",
+                        principalTable: "Milestones",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -186,7 +186,7 @@ namespace HubSync.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "IssueLabel",
+                name: "IssueLabels",
                 columns: table => new
                 {
                     LabelId = table.Column<int>(nullable: false),
@@ -194,17 +194,17 @@ namespace HubSync.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_IssueLabel", x => new { x.IssueId, x.LabelId });
+                    table.PrimaryKey("PK_IssueLabels", x => new { x.IssueId, x.LabelId });
                     table.ForeignKey(
-                        name: "FK_IssueLabel_Issues_IssueId",
+                        name: "FK_IssueLabels_Issues_IssueId",
                         column: x => x.IssueId,
                         principalTable: "Issues",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_IssueLabel_Label_LabelId",
+                        name: "FK_IssueLabels_Labels_LabelId",
                         column: x => x.LabelId,
-                        principalTable: "Label",
+                        principalTable: "Labels",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -221,8 +221,8 @@ namespace HubSync.Migrations
                 column: "AssigneeId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_IssueLabel_LabelId",
-                table: "IssueLabel",
+                name: "IX_IssueLabels_LabelId",
+                table: "IssueLabels",
                 column: "LabelId");
 
             migrationBuilder.CreateIndex(
@@ -247,13 +247,13 @@ namespace HubSync.Migrations
                 column: "RepositoryId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Label_RepositoryId",
-                table: "Label",
+                name: "IX_Labels_RepositoryId",
+                table: "Labels",
                 column: "RepositoryId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Milestone_RepositoryId",
-                table: "Milestone",
+                name: "IX_Milestones_RepositoryId",
+                table: "Milestones",
                 column: "RepositoryId");
 
             migrationBuilder.CreateIndex(
@@ -274,7 +274,7 @@ namespace HubSync.Migrations
                 name: "IssueAssignees");
 
             migrationBuilder.DropTable(
-                name: "IssueLabel");
+                name: "IssueLabels");
 
             migrationBuilder.DropTable(
                 name: "SyncLog");
@@ -283,13 +283,13 @@ namespace HubSync.Migrations
                 name: "Issues");
 
             migrationBuilder.DropTable(
-                name: "Label");
+                name: "Labels");
 
             migrationBuilder.DropTable(
                 name: "Actors");
 
             migrationBuilder.DropTable(
-                name: "Milestone");
+                name: "Milestones");
 
             migrationBuilder.DropTable(
                 name: "Repositories");

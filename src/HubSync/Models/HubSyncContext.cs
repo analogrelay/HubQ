@@ -11,7 +11,10 @@ namespace HubSync.Models
         public DbSet<Repository> Repositories { get; set; } = null!;
         public DbSet<Issue> Issues { get; set; } = null!;
         public DbSet<Actor> Actors { get; set; } = null!;
+        public DbSet<Label> Labels { get; set; } = null!;
+        public DbSet<Milestone> Milestones { get; set; } = null!;
         public DbSet<IssueAssignee> IssueAssignees { get; set; } = null!;
+        public DbSet<IssueLabel> IssueLabels { get; set; } = null!;
 
         public HubSyncContext(DbContextOptions options) : base(options)
         {
@@ -109,6 +112,8 @@ namespace HubSync.Models
                     .WithMany(r => r!.Labels)
                     .HasForeignKey(l => l.RepositoryId)
                     .IsRequired();
+
+                label.ToTable("Labels");
             });
 
             modelBuilder.Entity<Milestone>(milestone =>
@@ -122,6 +127,8 @@ namespace HubSync.Models
                     .WithMany(r => r!.Milestones)
                     .HasForeignKey(m => m.RepositoryId)
                     .IsRequired();
+
+                milestone.ToTable("Milestones");
             });
 
             modelBuilder.Entity<IssueLabel>(issueLabel =>
@@ -141,6 +148,8 @@ namespace HubSync.Models
                     .HasForeignKey(i => i.LabelId)
                     .OnDelete(DeleteBehavior.Restrict)
                     .IsRequired();
+
+                issueLabel.ToTable("IssueLabels");
             });
         }
 }

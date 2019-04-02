@@ -19,6 +19,8 @@ namespace HubSync.Synchronization
         private Dictionary<string, Actor> _actorCache = new Dictionary<string, Actor>();
         private Dictionary<long, Models.Repository> _repoCache = new Dictionary<long, Models.Repository>();
         private Dictionary<long, Models.Issue> _issueCache = new Dictionary<long, Models.Issue>();
+        private Dictionary<string, Models.Label> _labelCache = new Dictionary<string, Models.Label>();
+        private Dictionary<string, Models.Milestone> _milestoneCache = new Dictionary<string, Models.Milestone>();
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<SyncManager> _logger;
 
@@ -88,8 +90,8 @@ namespace HubSync.Synchronization
             else
             {
                 model = await Db.Issues
-                    .Include(i => i.Assignees)
-                    .Include(i => i.Labels)
+                    .Include(i => i.Assignees!).ThenInclude((IssueAssignee a) => a.Assignee)
+                    .Include(i => i.Labels!).ThenInclude((IssueLabel l) => l.Label)
                     .FirstOrDefaultAsync(i => i.GitHubId == issue.Id);
                 if (model == null)
                 {
@@ -106,23 +108,109 @@ namespace HubSync.Synchronization
             model.Author = author;
             model.Repository = repo;
 
+            // Update milestone
+            if (issue.Milestone != null)
+            {
+                var milestone = await SyncMilestoneAsync(repo, issue.Milestone);
+                model.Milestone = milestone;
+            }
+
             // Update assignees
-            foreach(var assignee in issue.Assignees)
+            foreach (var assignee in issue.Assignees)
             {
                 var actor = await SyncActorAsync(assignee);
-                if(!model.Assignees.Any(a => a.AssigneeId == actor.Id))
+                if (model.Assignees == null)
+                {
+                    model.Assignees = new List<IssueAssignee>();
+                }
+
+                if (!model.Assignees.Any(a => a.Assignee!.Login == actor.Login))
                 {
                     var issueAssignee = new IssueAssignee()
                     {
                         Issue = model,
-                        Assignee = actor
+                        Assignee = actor,
                     };
                     Db.IssueAssignees.Add(issueAssignee);
-                    model.Assignees!.Add(issueAssignee);
+                    model.Assignees.Add(issueAssignee);
+                }
+            }
+
+            // Update labels
+            foreach (var label in issue.Labels)
+            {
+                var labelModel = await SyncLabelAsync(repo, label);
+                if (model.Labels == null)
+                {
+                    model.Labels = new List<IssueLabel>();
+                }
+                if(!model.Labels.Any(l => l.Label!.Name == label.Name))
+                {
+                    var issueLabel = new IssueLabel()
+                    {
+                        Issue = model,
+                        Label = labelModel,
+                    };
+                    Db.IssueLabels.Add(issueLabel);
+                    model.Labels.Add(issueLabel);
                 }
             }
 
             _issueCache[model.GitHubId] = model;
+            return model;
+        }
+
+        public async ValueTask<Models.Label> SyncLabelAsync(Models.Repository repo, Octokit.Label label)
+        {
+            Models.Label model;
+            if (_labelCache.TryGetValue(label.NodeId, out model))
+            {
+                _logger.LogTrace("Loaded label {Name} from cache.", label.Name);
+            }
+            else
+            {
+                model = await Db.Labels
+                    .FirstOrDefaultAsync(i => i.NodeId == label.NodeId);
+                if (model == null)
+                {
+                    _logger.LogTrace("Synchronizing new label {Name}.", label.Name);
+                    model = new Models.Label();
+                    Db.Labels.Add(model);
+                }
+            }
+
+            model.UpdateFrom(label);
+            model.Repository = repo;
+
+            _labelCache[label.NodeId] = model;
+
+            return model;
+        }
+
+        public async ValueTask<Models.Milestone> SyncMilestoneAsync(Models.Repository repo, Octokit.Milestone milestone)
+        {
+            Models.Milestone model;
+            if (_milestoneCache.TryGetValue(milestone.NodeId, out model))
+            {
+                _logger.LogTrace("Loaded milestone {Title} from cache.", milestone.Title);
+            }
+            else
+            {
+                model = await Db.Milestones
+                    .FirstOrDefaultAsync(i => i.NodeId == milestone.NodeId);
+                if (model == null)
+                {
+                    _logger.LogTrace("Synchronizing new milestone {Title}.", milestone.Title);
+                    model = new Models.Milestone();
+                    Db.Milestones.Add(model);
+                }
+            }
+
+            model.UpdateFrom(milestone);
+            model.Repository = repo;
+
+            _milestoneCache[milestone.NodeId] = model;
+
             return model;
         }
 

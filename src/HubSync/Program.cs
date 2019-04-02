@@ -53,6 +53,8 @@ namespace HubSync
             var app = new CommandLineApplication<Program>();
             var services = new ServiceCollection();
             ConfigureServices(services, verbose);
+            var provider = services.BuildServiceProvider();
+            var logger = provider.GetRequiredService<ILogger<Program>>();
             app.Conventions
                 .UseDefaultConventions()
                 .UseConstructorInjection(services.BuildServiceProvider());
@@ -65,13 +67,12 @@ namespace HubSync
             }
             catch (CommandLineException clex)
             {
-                Console.Error.WriteLine(clex.Message);
+                logger.LogError(clex.Message);
                 return 1;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("Unhandled exception:");
-                Console.Error.WriteLine(ex.ToString());
+                logger.LogError(ex, "Unhandled exception:");
                 return 1;
             }
 
