@@ -15,6 +15,7 @@ namespace HubSync.Models
         public DbSet<Milestone> Milestones { get; set; } = null!;
         public DbSet<IssueAssignee> IssueAssignees { get; set; } = null!;
         public DbSet<IssueLabel> IssueLabels { get; set; } = null!;
+        public DbSet<IssueLink> IssueLinks { get; set; } = null!;
 
         public HubSyncContext(DbContextOptions options) : base(options)
         {
@@ -150,6 +151,25 @@ namespace HubSync.Models
                     .IsRequired();
 
                 issueLabel.ToTable("IssueLabels");
+            });
+
+            modelBuilder.Entity<IssueLink>(issueLink =>
+            {
+                issueLink.Property(l => l.LinkType).IsRequired();
+                issueLink.Property(l => l.RepoOwner).IsRequired();
+                issueLink.Property(l => l.RepoName).IsRequired();
+
+                issueLink
+                    .HasOne(i => i.Issue)
+                    .WithMany(i => i!.OutboundLinks)
+                    .HasForeignKey(i => i.IssueId);
+
+                issueLink
+                    .HasOne(i => i.Target)
+                    .WithMany(i => i!.InboundLinks)
+                    .HasForeignKey(i => i.TargetId);
+
+                issueLink.ToTable("IssueLinks");
             });
         }
 }

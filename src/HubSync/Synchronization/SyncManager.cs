@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using HubSync.Models;
 using Microsoft.EntityFrameworkCore;
@@ -116,48 +117,95 @@ namespace HubSync.Synchronization
             }
 
             // Update assignees
+            this logic doesnt properly handle merging/purging data :(
+            if (model.Assignees == null)
+            {
+                model.Assignees = new List<IssueAssignee>();
+            }
+            else
+            {
+                model.Assignees.Clear();
+            }
             foreach (var assignee in issue.Assignees)
             {
                 var actor = await SyncActorAsync(assignee);
-                if (model.Assignees == null)
+                var issueAssignee = new IssueAssignee()
                 {
-                    model.Assignees = new List<IssueAssignee>();
-                }
-
-                if (!model.Assignees.Any(a => a.Assignee!.Login == actor.Login))
-                {
-                    var issueAssignee = new IssueAssignee()
-                    {
-                        Issue = model,
-                        Assignee = actor,
-                    };
-                    Db.IssueAssignees.Add(issueAssignee);
-                    model.Assignees.Add(issueAssignee);
-                }
+                    Issue = model,
+                    Assignee = actor,
+                };
+                Db.IssueAssignees.Add(issueAssignee);
+                model.Assignees.Add(issueAssignee);
             }
 
             // Update labels
+            if (model.Labels == null)
+            {
+                model.Labels = new List<IssueLabel>();
+            }
+            else
+            {
+                model.Labels.Clear();
+            }
             foreach (var label in issue.Labels)
             {
                 var labelModel = await SyncLabelAsync(repo, label);
-                if (model.Labels == null)
+                var issueLabel = new IssueLabel()
                 {
-                    model.Labels = new List<IssueLabel>();
-                }
-                if(!model.Labels.Any(l => l.Label!.Name == label.Name))
+                    Issue = model,
+                    Label = labelModel,
+                };
+                Db.IssueLabels.Add(issueLabel);
+                model.Labels.Add(issueLabel);
+            }
+
+            // Scan the body for outbound links
+            if (model.OutboundLinks == null)
+            {
+                model.OutboundLinks = new List<IssueLink>();
+            }
+            else
+            {
+                model.OutboundLinks.Clear();
+            }
+
+            foreach (var (linkType, owner, repoName, number) in ScanForLinks(issue.Body))
+            {
+                var link = new IssueLink()
                 {
-                    var issueLabel = new IssueLabel()
-                    {
-                        Issue = model,
-                        Label = labelModel,
-                    };
-                    Db.IssueLabels.Add(issueLabel);
-                    model.Labels.Add(issueLabel);
-                }
+                    LinkType = linkType,
+                    RepoOwner = string.IsNullOrEmpty(owner) ? repo.Owner : owner,
+                    RepoName = string.IsNullOrEmpty(repoName) ? repo.Name : repoName,
+                    Number = number
+                };
+                Db.IssueLinks.Add(link);
+                model.OutboundLinks.Add(link);
             }
 
             _issueCache[model.GitHubId] = model;
             return model;
+        }
+
+        // I think this regex speaks for itself -nobody ever
+        // It's for parsing GitHub issue links in each of the following forms:
+        // * '#1234' - In-repo short-form links
+        // * 'owner/repo#1234' - Cross-repo short-form links
+        // * 'http://github.com/owner/repo/issues/1234/' - URL-based links (also supports HTTPS and "www." prefix as well as the optional trailing '/')
+        private static readonly Regex _issueLinkScanner = new Regex(
+            @"^(?<linkType>[^\s]+)\s+((https?://(www\.)?github.com/(?<owner>[a-zA-Z0-9-_]+)/(?<repo>[a-zA-Z0-9-_]+)/issues/(?<number>[0-9]+)/?)|(((?<owner>[a-zA-Z0-9-_]+ )/(?<repo>[a-zA-Z0-9-_]+))?#(?<number>[0-9]+)))\s*$",
+            RegexOptions.Multiline);
+        private IEnumerable<(string LinkType, string Owner, string RepoName, int Number)> ScanForLinks(string body)
+        {
+            // Ahh, ye olde implementors of IEnumerable (non-generic)
+            var matches = _issueLinkScanner.Matches(body).Cast<Match>();
+            foreach (var match in matches)
+            {
+                var linkType = match.Groups["linkType"].Value;
+                var owner = match.Groups["owner"].Value;
+                var repoName = match.Groups["repo"].Value;
+                var number = int.Parse(match.Groups["number"].Value);
+                yield return (linkType, owner, repoName, number);
+            }
         }
 
         public async ValueTask<Models.Label> SyncLabelAsync(Models.Repository repo, Octokit.Label label)

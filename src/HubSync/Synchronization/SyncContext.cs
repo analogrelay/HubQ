@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using HubSync.Models;
 using Microsoft.Extensions.Logging;
 using Octokit;
@@ -44,6 +45,12 @@ namespace HubSync.Synchronization
                 AcceptHeaders.Concat(
                     AcceptHeaders.GitHubAppsPreview,
                     AcceptHeaders.ReactionsPreview));
+        }
+
+        public async Task CompleteAsync()
+        {
+            LogEntry.Completed = DateTimeOffset.UtcNow;
+            await _manager.SaveChangesAsync();
         }
     }
 }

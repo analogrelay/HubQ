@@ -26,6 +26,8 @@ namespace HubSync.Models
         public virtual Repository? Repository { get; set; }
         public virtual IList<IssueAssignee>? Assignees { get; set; }
         public virtual IList<IssueLabel>? Labels { get; set; }
+        public virtual IList<IssueLink>? OutboundLinks { get; set; }
+        public virtual IList<IssueLink>? InboundLinks { get; set; }
 
         internal void UpdateFrom(Octokit.Issue issue)
         {

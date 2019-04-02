@@ -123,6 +123,9 @@ namespace HubSync
                 _logger.LogDebug("Current memory usage {FormattedMemoryUsage}", FormatSize(GC.GetTotalMemory(forceFullCollection: false)));
             }
 
+            // Complete the sync
+            await context.CompleteAsync();
+
             return true;
         }
 
