@@ -23,7 +23,7 @@ namespace HubSync
         }
 
         private static readonly Assembly Asm = typeof(Program).Assembly;
-        public static readonly string Version = Asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        public static readonly string Version = Asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
         public static readonly string Name = Asm.GetName().Name;
 
         static int Main(string[] args)
