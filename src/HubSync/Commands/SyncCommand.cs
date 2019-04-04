@@ -2,16 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
-using HubSync.Models;
 using HubSync.Synchronization;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Octokit;
 
-namespace HubSync
+namespace HubSync.Commands
 {
     [Command("sync", Description = "Synchronizes the specified repositories to the database.")]
     public class SyncCommand : DatabaseCommandBase

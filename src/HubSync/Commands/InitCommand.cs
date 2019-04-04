@@ -3,7 +3,7 @@ using McMaster.Extensions.CommandLineUtils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace HubSync
+namespace HubSync.Commands
 {
     [Command("init", Description = "Initializes a new HubSync database.")]
     public class InitCommand : DatabaseCommandBase
