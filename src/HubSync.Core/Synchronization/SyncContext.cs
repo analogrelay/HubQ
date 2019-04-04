@@ -7,7 +7,7 @@ using Octokit;
 
 namespace HubSync.Synchronization
 {
-    internal class SyncContext
+    public class SyncContext
     {
         private readonly SyncManager _manager;
         private readonly ILogger<SyncContext> _logger;

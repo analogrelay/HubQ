@@ -7,8 +7,6 @@ namespace HubSync
 {
     public abstract class DatabaseCommandBase
     {
-        public static readonly string LocalConnectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=HubSync;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
-
         [Option("--mssql <SQL_CONNECTION_STRING>", Description = "SQL Server connection string.")]
         public string? SqlConnectionString { get; set; }
 
@@ -30,7 +28,7 @@ namespace HubSync
                     throw new CommandLineException("Cannot specify both '--mssql' and '--mssql-local' options.");
                 }
 
-                SqlConnectionString = LocalConnectionString;
+                SqlConnectionString = HubSyncContext.LocalConnectionString;
             }
 
             if (string.IsNullOrEmpty(SqlConnectionString))

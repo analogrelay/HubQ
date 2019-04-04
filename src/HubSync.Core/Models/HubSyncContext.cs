@@ -6,6 +6,8 @@ namespace HubSync.Models
 {
     public class HubSyncContext : DbContext
     {
+        public static readonly string LocalConnectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=HubSync;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
+
         // We trust that EF has initialized this. Initializing to `null!` tells C# nullability analyzer to GTFO
         public DbSet<SyncLogEntry> SyncLog { get; set; } = null!;
         public DbSet<Repository> Repositories { get; set; } = null!;

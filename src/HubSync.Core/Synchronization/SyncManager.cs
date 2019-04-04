@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -12,7 +11,7 @@ using Octokit;
 
 namespace HubSync.Synchronization
 {
-    internal class SyncManager
+    public class SyncManager
     {
         public HubSyncContext Db { get; }
         public GitHubClient GitHub { get; }
@@ -33,7 +32,7 @@ namespace HubSync.Synchronization
             _logger = loggerFactory.CreateLogger<SyncManager>();
         }
 
-        public async ValueTask<Actor> SyncActorAsync(Octokit.User user)
+        public async Task<Actor> SyncActorAsync(Octokit.User user)
         {
             Actor model;
             if (_actorCache.TryGetValue(user.Login, out model))
@@ -57,7 +56,7 @@ namespace HubSync.Synchronization
             return model;
         }
 
-        public async ValueTask<Models.Repository> SyncRepoAsync(Octokit.Repository repo)
+        public async Task<Models.Repository> SyncRepoAsync(Octokit.Repository repo)
         {
             Models.Repository model;
             if (_repoCache.TryGetValue(repo.Id, out model))
@@ -81,7 +80,7 @@ namespace HubSync.Synchronization
             return model;
         }
 
-        public async ValueTask<Models.Issue> SyncIssueAsync(Models.Repository repo, Octokit.Issue issue)
+        public async Task<Models.Issue> SyncIssueAsync(Models.Repository repo, Octokit.Issue issue)
         {
             Models.Issue model;
             if (_issueCache.TryGetValue(issue.Id, out model))
@@ -91,8 +90,9 @@ namespace HubSync.Synchronization
             else
             {
                 model = await Db.Issues
-                    .Include(i => i.Assignees!).ThenInclude((IssueAssignee a) => a.Assignee)
-                    .Include(i => i.Labels!).ThenInclude((IssueLabel l) => l.Label)
+                    .Include(i => i.Assignees!)
+                    .Include(i => i.Labels!)
+                    .Include(i => i.OutboundLinks!)
                     .FirstOrDefaultAsync(i => i.GitHubId == issue.Id);
                 if (model == null)
                 {
@@ -117,13 +117,16 @@ namespace HubSync.Synchronization
             }
 
             // Update assignees
-            this logic doesnt properly handle merging/purging data :(
             if (model.Assignees == null)
             {
                 model.Assignees = new List<IssueAssignee>();
             }
             else
             {
+                foreach (var existingAssignee in model.Assignees)
+                {
+                    Db.IssueAssignees.Remove(existingAssignee);
+                }
                 model.Assignees.Clear();
             }
             foreach (var assignee in issue.Assignees)
@@ -145,6 +148,10 @@ namespace HubSync.Synchronization
             }
             else
             {
+                foreach (var existingLabel in model.Labels)
+                {
+                    Db.IssueLabels.Remove(existingLabel);
+                }
                 model.Labels.Clear();
             }
             foreach (var label in issue.Labels)
@@ -166,6 +173,10 @@ namespace HubSync.Synchronization
             }
             else
             {
+                foreach (var existingLink in model.OutboundLinks)
+                {
+                    Db.IssueLinks.Remove(existingLink);
+                }
                 model.OutboundLinks.Clear();
             }
 
@@ -208,7 +219,7 @@ namespace HubSync.Synchronization
             }
         }
 
-        public async ValueTask<Models.Label> SyncLabelAsync(Models.Repository repo, Octokit.Label label)
+        public async Task<Models.Label> SyncLabelAsync(Models.Repository repo, Octokit.Label label)
         {
             Models.Label model;
             if (_labelCache.TryGetValue(label.NodeId, out model))
@@ -235,7 +246,7 @@ namespace HubSync.Synchronization
             return model;
         }
 
-        public async ValueTask<Models.Milestone> SyncMilestoneAsync(Models.Repository repo, Octokit.Milestone milestone)
+        public async Task<Models.Milestone> SyncMilestoneAsync(Models.Repository repo, Octokit.Milestone milestone)
         {
             Models.Milestone model;
             if (_milestoneCache.TryGetValue(milestone.NodeId, out model))

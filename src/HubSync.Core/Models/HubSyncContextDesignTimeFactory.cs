@@ -8,7 +8,7 @@ namespace HubSync.Models
         public HubSyncContext CreateDbContext(string[] args)
         {
             var options = new DbContextOptionsBuilder()
-                .UseSqlServer(DatabaseCommandBase.LocalConnectionString)
+                .UseSqlServer(HubSyncContext.LocalConnectionString)
                 .Options;
             return new HubSyncContext(options);
         }
