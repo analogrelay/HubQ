@@ -20,6 +20,7 @@ namespace HubSync.Models
         public IssueReactions? Reactions { get; set; }
         public int AuthorId { get; set; }
         public int? MilestoneId { get; set; }
+        public bool IsPullRequest { get; set; }
 
         public virtual Milestone? Milestone { get; set; }
         public virtual Actor? Author { get; set; }

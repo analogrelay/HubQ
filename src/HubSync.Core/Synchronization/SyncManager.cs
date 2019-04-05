@@ -17,6 +17,7 @@ namespace HubSync.Synchronization
         public GitHubClient GitHub { get; }
 
         private Dictionary<string, Actor> _actorCache = new Dictionary<string, Actor>();
+        private Dictionary<(string, string), Team> _teamCache = new Dictionary<(string, string), Team>();
         private Dictionary<(string, string), Models.Repository> _repoCache = new Dictionary<(string, string), Models.Repository>();
         private Dictionary<long, Models.Issue> _issueCache = new Dictionary<long, Models.Issue>();
         private Dictionary<string, Models.Label> _labelCache = new Dictionary<string, Models.Label>();
@@ -32,19 +33,43 @@ namespace HubSync.Synchronization
             _logger = loggerFactory.CreateLogger<SyncManager>();
         }
 
+        public async Task<Models.Team> SyncTeamAsync(Octokit.Team team)
+        {
+            Models.Team model;
+            if (_teamCache.TryGetValue((team.Organization.Name, team.Name), out model))
+            {
+                _logger.LogTrace("Loaded team {Owner}/{Name} from cache.", team.Organization.Name, team.Name);
+            }
+            else
+            {
+                model = await Db.Teams.FirstOrDefaultAsync(t => t.Organization == team.Organization.Name && t.Name == team.Name);
+                if (model == null)
+                {
+                    _logger.LogTrace("Synchronizing new team {Owner}/{Name}.", team.Organization.Name, team.Name);
+                    model = new Models.Team();
+                    Db.Actors.Add(model);
+                }
+            }
+
+            model.UpdateFrom(team);
+
+            _teamCache[(model.Organization!, model.Name!)] = model;
+            return model;
+        }
+
         public async Task<Actor> SyncActorAsync(Octokit.User user)
         {
             Actor model;
-            if (_actorCache.TryGetValue(user.Login, out model))
+            if (_actorCache.TryGetValue(user.Name, out model))
             {
-                _logger.LogTrace("Loaded user {Login} from cache.", user.Login);
+                _logger.LogTrace("Loaded user {Name} from cache.", user.Name);
             }
             else
             {
                 model = await Db.Actors.FirstOrDefaultAsync(a => a.GitHubId == user.Id);
                 if (model == null)
                 {
-                    _logger.LogTrace("Synchronizing new user {Login}.", user.Login);
+                    _logger.LogTrace("Synchronizing new user {Name}.", user.Name);
                     model = new Actor();
                     Db.Actors.Add(model);
                 }
@@ -52,7 +77,7 @@ namespace HubSync.Synchronization
 
             model.UpdateFrom(user);
 
-            _actorCache[user.Login] = model;
+            _actorCache[user.Name] = model;
             return model;
         }
 
@@ -92,16 +117,16 @@ namespace HubSync.Synchronization
         public async Task<Models.Repository> SyncRepoAsync(Octokit.Repository repo)
         {
             Models.Repository model;
-            if (_repoCache.TryGetValue((repo.Owner.Login, repo.Name), out model))
+            if (_repoCache.TryGetValue((repo.Owner.Name, repo.Name), out model))
             {
                 _logger.LogTrace("Loaded repo {Owner}/{Name} from cache.", model.Owner, model.Name);
             }
             else
             {
-                model = await Db.Repositories.FirstOrDefaultAsync(r => r.Owner == repo.Owner.Login && r.Name == repo.Name);
+                model = await Db.Repositories.FirstOrDefaultAsync(r => r.Owner == repo.Owner.Name && r.Name == repo.Name);
                 if (model == null)
                 {
-                    _logger.LogTrace("Synchronizing new repo {Owner}/{Name}.", repo.Owner.Login, repo.Name);
+                    _logger.LogTrace("Synchronizing new repo {Owner}/{Name}.", repo.Owner.Name, repo.Name);
                     model = new Models.Repository();
                     Db.Repositories.Add(model);
                 }
@@ -362,7 +387,7 @@ namespace HubSync.Synchronization
             var nextLog = new SyncLogEntry()
             {
                 Repository = repo,
-                User = user.Login,
+                User = user.Name,
                 Started = syncStart,
                 WaterMark = waterMark,
                 StartRateLimit = rateLimits.Resources.Core.Remaining,

@@ -18,6 +18,9 @@ namespace HubSync.Models
         public DbSet<IssueAssignee> IssueAssignees { get; set; } = null!;
         public DbSet<IssueLabel> IssueLabels { get; set; } = null!;
         public DbSet<IssueLink> IssueLinks { get; set; } = null!;
+        public DbSet<PullRequest> PullRequests { get; set; } = null!;
+        public DbSet<ReviewRequest> ReviewRequests { get; set; } = null!;
+        public DbSet<Team> Teams { get; set; } = null!;
 
         public HubSyncContext(DbContextOptions options) : base(options)
         {
@@ -47,7 +50,16 @@ namespace HubSync.Models
             modelBuilder.Entity<Actor>(actor =>
             {
                 actor.HasIndex(a => a.GitHubId).IsUnique();
-                actor.Property(a => a.Login).IsRequired();
+                actor.Property(a => a.Name).IsRequired();
+
+                actor.Property(a => a.Kind).HasConversion(new StringToEnumConverter<ActorKind>());
+
+                actor
+                    .HasDiscriminator(a => a.Kind)
+                    .HasValue<Actor>(ActorKind.Bot)
+                    .HasValue<Actor>(ActorKind.User)
+                    .HasValue<Actor>(ActorKind.Organization)
+                    .HasValue<Team>(ActorKind.Team);
             });
 
             modelBuilder.Entity<Repository>(repo =>
@@ -82,8 +94,38 @@ namespace HubSync.Models
                     .HasForeignKey(i => i.MilestoneId)
                     .IsRequired(required: false);
 
-                issue.OwnsOne(i => i.Reactions)
+                issue
+                    .OwnsOne(i => i.Reactions)
                     .WithOwner();
+
+                issue
+                    .HasDiscriminator(i => i.IsPullRequest)
+                    .HasValue<Issue>(false)
+                    .HasValue<PullRequest>(true);
+            });
+
+            modelBuilder.Entity<PullRequest>(pullRequest =>
+            {
+                pullRequest
+                    .OwnsOne(p => p.Head)
+                    .WithOwner();
+
+                pullRequest
+                    .OwnsOne(p => p.Base)
+                    .WithOwner();
+            });
+
+            modelBuilder.Entity<ReviewRequest>(reviewer =>
+            {
+                reviewer
+                    .HasOne(r => r.PullRequest)
+                    .WithMany(p => p.ReviewRequests)
+                    .HasForeignKey(r => r.PullRequestId);
+
+                reviewer
+                    .HasOne(r => r.User)
+                    .WithMany(u => u.ReviewRequests)
+                    .HasForeignKey(r => r.UserId);
             });
 
             modelBuilder.Entity<IssueAssignee>(issueAssignee =>
