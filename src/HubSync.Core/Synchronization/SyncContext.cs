@@ -9,6 +9,7 @@ namespace HubSync.Synchronization
 {
     public class SyncContext
     {
+        private static readonly string _acceptHeaders = AcceptHeaders.Concat(AcceptHeaders.GitHubAppsPreview, AcceptHeaders.ReactionsPreview);
         private readonly SyncManager _manager;
         private readonly ILogger<SyncContext> _logger;
 
@@ -42,15 +43,43 @@ namespace HubSync.Synchronization
                 _manager.GitHub,
                 new Uri($"https://api.github.com/repos/{Repo.Owner}/{Repo.Name}/issues"),
                 parameters,
-                AcceptHeaders.Concat(
-                    AcceptHeaders.GitHubAppsPreview,
-                    AcceptHeaders.ReactionsPreview));
+                _acceptHeaders);
         }
 
         public async Task CompleteAsync()
         {
+            LogEntry.EndRateLimit = _manager.GitHub.GetLastApiInfo().RateLimit.Remaining;
             LogEntry.Completed = DateTimeOffset.UtcNow;
             await _manager.SaveChangesAsync();
+        }
+
+        public Pager<Octokit.Milestone> GetMilestones()
+        {
+            var parameters = new Dictionary<string, string>()
+            {
+                { "state", "all" },
+                { "per_page", "100" }
+            };
+            // No 'since' field but that's OK because milestones are fewer
+            return new Pager<Octokit.Milestone>(
+                _manager.GitHub,
+                new Uri($"https://api.github.com/repos/{Repo.Owner}/{Repo.Name}/milestones"),
+                parameters,
+                _acceptHeaders);
+        }
+
+        public Pager<Octokit.Label> GetLabels()
+        {
+            var parameters = new Dictionary<string, string>()
+            {
+                { "per_page", "100" }
+            };
+            // No 'since' field but that's OK because milestones are fewer
+            return new Pager<Octokit.Label>(
+                _manager.GitHub,
+                new Uri($"https://api.github.com/repos/{Repo.Owner}/{Repo.Name}/labels"),
+                parameters,
+                _acceptHeaders);
         }
     }
 }

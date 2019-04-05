@@ -10,9 +10,9 @@ namespace HubSync.Synchronization
         private static readonly Dictionary<string, string> EmptyDictionary = new Dictionary<string, string>();
 
         private readonly GitHubClient _client;
+        private readonly string _accepts;
         private Uri _url;
         private Dictionary<string, string> _parameters;
-        private string _accepts;
 
         public Pager(GitHubClient client, Uri url, Dictionary<string, string> parameters, string accepts)
         {

@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HubSync.Migrations
 {
     [DbContext(typeof(HubSyncContext))]
-    [Migration("20190402001844_Initial")]
+    [Migration("20190405004559_Initial")]
     partial class Initial
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -29,7 +29,7 @@ namespace HubSync.Migrations
 
                     b.Property<string>("AvatarUrl");
 
-                    b.Property<long>("GitHubId");
+                    b.Property<long?>("GitHubId");
 
                     b.Property<string>("Login")
                         .IsRequired();
@@ -39,7 +39,8 @@ namespace HubSync.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("GitHubId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[GitHubId] IS NOT NULL");
 
                     b.ToTable("Actors");
                 });
@@ -61,7 +62,7 @@ namespace HubSync.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt");
 
-                    b.Property<long>("GitHubId");
+                    b.Property<long?>("GitHubId");
 
                     b.Property<bool>("Locked");
 
@@ -85,7 +86,8 @@ namespace HubSync.Migrations
                     b.HasIndex("AuthorId");
 
                     b.HasIndex("GitHubId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[GitHubId] IS NOT NULL");
 
                     b.HasIndex("MilestoneId");
 
@@ -118,6 +120,30 @@ namespace HubSync.Migrations
                     b.HasIndex("LabelId");
 
                     b.ToTable("IssueLabels");
+                });
+
+            modelBuilder.Entity("HubSync.Models.IssueLink", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<int>("IssueId");
+
+                    b.Property<string>("LinkType")
+                        .IsRequired();
+
+                    b.Property<int>("Number");
+
+                    b.Property<int>("RepositoryId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IssueId");
+
+                    b.HasIndex("RepositoryId");
+
+                    b.ToTable("IssueLinks");
                 });
 
             modelBuilder.Entity("HubSync.Models.Label", b =>
@@ -177,7 +203,7 @@ namespace HubSync.Migrations
                         .ValueGeneratedOnAdd()
                         .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    b.Property<long>("GitHubId");
+                    b.Property<long?>("GitHubId");
 
                     b.Property<string>("Name")
                         .IsRequired();
@@ -190,7 +216,8 @@ namespace HubSync.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("GitHubId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[GitHubId] IS NOT NULL");
 
                     b.ToTable("Repositories");
                 });
@@ -203,7 +230,11 @@ namespace HubSync.Migrations
 
                     b.Property<DateTimeOffset?>("Completed");
 
+                    b.Property<int?>("EndRateLimit");
+
                     b.Property<int>("RepositoryId");
+
+                    b.Property<int>("StartRateLimit");
 
                     b.Property<DateTimeOffset>("Started");
 
@@ -287,6 +318,19 @@ namespace HubSync.Migrations
                     b.HasOne("HubSync.Models.Label", "Label")
                         .WithMany("Issues")
                         .HasForeignKey("LabelId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("HubSync.Models.IssueLink", b =>
+                {
+                    b.HasOne("HubSync.Models.Issue", "Issue")
+                        .WithMany("OutboundLinks")
+                        .HasForeignKey("IssueId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("HubSync.Models.Repository", "TargetRepository")
+                        .WithMany()
+                        .HasForeignKey("RepositoryId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 

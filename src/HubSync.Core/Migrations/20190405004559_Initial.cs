@@ -15,7 +15,7 @@ namespace HubSync.Migrations
                     Id = table.Column<int>(nullable: false)
                         .Annotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn),
                     NodeId = table.Column<string>(nullable: true),
-                    GitHubId = table.Column<long>(nullable: false),
+                    GitHubId = table.Column<long>(nullable: true),
                     Login = table.Column<string>(nullable: false),
                     AvatarUrl = table.Column<string>(nullable: true)
                 },
@@ -31,7 +31,7 @@ namespace HubSync.Migrations
                     Id = table.Column<int>(nullable: false)
                         .Annotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn),
                     NodeId = table.Column<string>(nullable: true),
-                    GitHubId = table.Column<long>(nullable: false),
+                    GitHubId = table.Column<long>(nullable: true),
                     Owner = table.Column<string>(nullable: false),
                     Name = table.Column<string>(nullable: false)
                 },
@@ -97,7 +97,9 @@ namespace HubSync.Migrations
                     User = table.Column<string>(nullable: false),
                     Started = table.Column<DateTimeOffset>(nullable: false),
                     WaterMark = table.Column<DateTimeOffset>(nullable: false),
-                    Completed = table.Column<DateTimeOffset>(nullable: true)
+                    Completed = table.Column<DateTimeOffset>(nullable: true),
+                    StartRateLimit = table.Column<int>(nullable: false),
+                    EndRateLimit = table.Column<int>(nullable: true)
                 },
                 constraints: table =>
                 {
@@ -117,7 +119,7 @@ namespace HubSync.Migrations
                     Id = table.Column<int>(nullable: false)
                         .Annotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn),
                     NodeId = table.Column<string>(nullable: true),
-                    GitHubId = table.Column<long>(nullable: false),
+                    GitHubId = table.Column<long>(nullable: true),
                     RepositoryId = table.Column<int>(nullable: false),
                     Number = table.Column<int>(nullable: false),
                     Title = table.Column<string>(nullable: false),
@@ -209,11 +211,40 @@ namespace HubSync.Migrations
                         onDelete: ReferentialAction.Restrict);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "IssueLinks",
+                columns: table => new
+                {
+                    Id = table.Column<int>(nullable: false)
+                        .Annotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn),
+                    IssueId = table.Column<int>(nullable: false),
+                    LinkType = table.Column<string>(nullable: false),
+                    RepositoryId = table.Column<int>(nullable: false),
+                    Number = table.Column<int>(nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_IssueLinks", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_IssueLinks_Issues_IssueId",
+                        column: x => x.IssueId,
+                        principalTable: "Issues",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_IssueLinks_Repositories_RepositoryId",
+                        column: x => x.RepositoryId,
+                        principalTable: "Repositories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_Actors_GitHubId",
                 table: "Actors",
                 column: "GitHubId",
-                unique: true);
+                unique: true,
+                filter: "[GitHubId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_IssueAssignees_AssigneeId",
@@ -226,6 +257,16 @@ namespace HubSync.Migrations
                 column: "LabelId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_IssueLinks_IssueId",
+                table: "IssueLinks",
+                column: "IssueId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IssueLinks_RepositoryId",
+                table: "IssueLinks",
+                column: "RepositoryId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Issues_AuthorId",
                 table: "Issues",
                 column: "AuthorId");
@@ -234,7 +275,8 @@ namespace HubSync.Migrations
                 name: "IX_Issues_GitHubId",
                 table: "Issues",
                 column: "GitHubId",
-                unique: true);
+                unique: true,
+                filter: "[GitHubId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Issues_MilestoneId",
@@ -260,7 +302,8 @@ namespace HubSync.Migrations
                 name: "IX_Repositories_GitHubId",
                 table: "Repositories",
                 column: "GitHubId",
-                unique: true);
+                unique: true,
+                filter: "[GitHubId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_SyncLog_RepositoryId",
@@ -277,13 +320,16 @@ namespace HubSync.Migrations
                 name: "IssueLabels");
 
             migrationBuilder.DropTable(
+                name: "IssueLinks");
+
+            migrationBuilder.DropTable(
                 name: "SyncLog");
 
             migrationBuilder.DropTable(
-                name: "Issues");
+                name: "Labels");
 
             migrationBuilder.DropTable(
-                name: "Labels");
+                name: "Issues");
 
             migrationBuilder.DropTable(
                 name: "Actors");

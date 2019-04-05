@@ -2,6 +2,6 @@
 {
     public abstract class GitHubEntity : GraphQlEntity
     {
-        public long GitHubId { get; set; }
+        public long? GitHubId { get; set; }
     }
 }

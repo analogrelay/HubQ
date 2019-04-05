@@ -158,18 +158,19 @@ namespace HubSync.Models
             modelBuilder.Entity<IssueLink>(issueLink =>
             {
                 issueLink.Property(l => l.LinkType).IsRequired();
-                issueLink.Property(l => l.RepoOwner).IsRequired();
-                issueLink.Property(l => l.RepoName).IsRequired();
+
+                issueLink
+                    .HasOne(l => l.TargetRepository)
+                    .WithMany()
+                    .HasForeignKey(i => i.RepositoryId)
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 issueLink
                     .HasOne(i => i.Issue)
                     .WithMany(i => i!.OutboundLinks)
-                    .HasForeignKey(i => i.IssueId);
+                    .HasForeignKey(i => i.IssueId)
+                    .OnDelete(DeleteBehavior.Cascade);
 
-                issueLink
-                    .HasOne(i => i.Target)
-                    .WithMany(i => i!.InboundLinks)
-                    .HasForeignKey(i => i.TargetId);
 
                 issueLink.ToTable("IssueLinks");
             });

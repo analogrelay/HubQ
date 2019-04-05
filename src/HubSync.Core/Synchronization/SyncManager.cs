@@ -17,7 +17,7 @@ namespace HubSync.Synchronization
         public GitHubClient GitHub { get; }
 
         private Dictionary<string, Actor> _actorCache = new Dictionary<string, Actor>();
-        private Dictionary<long, Models.Repository> _repoCache = new Dictionary<long, Models.Repository>();
+        private Dictionary<(string, string), Models.Repository> _repoCache = new Dictionary<(string, string), Models.Repository>();
         private Dictionary<long, Models.Issue> _issueCache = new Dictionary<long, Models.Issue>();
         private Dictionary<string, Models.Label> _labelCache = new Dictionary<string, Models.Label>();
         private Dictionary<string, Models.Milestone> _milestoneCache = new Dictionary<string, Models.Milestone>();
@@ -56,16 +56,49 @@ namespace HubSync.Synchronization
             return model;
         }
 
+        public async Task<Models.Repository> SyncRepoAsync(string owner, string name)
+        {
+            Models.Repository model;
+            if (_repoCache.TryGetValue((owner, name), out model))
+            {
+                return model;
+            }
+            else
+            {
+                Octokit.Repository repo;
+                try
+                {
+                    repo = await GitHub.Repository.Get(owner, name);
+                }
+                catch (NotFoundException)
+                {
+                    // Either the repo doesn't exist or we don't have permission. Either way, we will go ahead and create it.
+                    model = await Db.Repositories.FirstOrDefaultAsync(r => r.Owner == owner && r.Name == name);
+                    if (model == null)
+                    {
+                        _logger.LogDebug("Repository {Owner}/{Name} does not exist or this user does not have permission for it. Creating a pseudo-repo entry.", owner, name);
+                        model = new Models.Repository();
+                        Db.Repositories.Add(model);
+                    }
+                    model.Owner = owner;
+                    model.Name = name;
+                    _repoCache[(owner, name)] = model;
+                    return model;
+                }
+                return await SyncRepoAsync(repo);
+            }
+        }
+
         public async Task<Models.Repository> SyncRepoAsync(Octokit.Repository repo)
         {
             Models.Repository model;
-            if (_repoCache.TryGetValue(repo.Id, out model))
+            if (_repoCache.TryGetValue((repo.Owner.Login, repo.Name), out model))
             {
                 _logger.LogTrace("Loaded repo {Owner}/{Name} from cache.", model.Owner, model.Name);
             }
             else
             {
-                model = await Db.Repositories.FirstOrDefaultAsync(r => r.GitHubId == repo.Id);
+                model = await Db.Repositories.FirstOrDefaultAsync(r => r.Owner == repo.Owner.Login && r.Name == repo.Name);
                 if (model == null)
                 {
                     _logger.LogTrace("Synchronizing new repo {Owner}/{Name}.", repo.Owner.Login, repo.Name);
@@ -76,7 +109,7 @@ namespace HubSync.Synchronization
 
             model.UpdateFrom(repo);
 
-            _repoCache[model.GitHubId] = model;
+            _repoCache[(model.Owner!, model.Name!)] = model;
             return model;
         }
 
@@ -182,18 +215,21 @@ namespace HubSync.Synchronization
 
             foreach (var (linkType, owner, repoName, number) in ScanForLinks(issue.Body))
             {
+                var targetRepo = (string.IsNullOrEmpty(owner) && string.IsNullOrEmpty(repoName)) ?
+                    repo :
+                    await SyncRepoAsync(owner, repoName);
+
                 var link = new IssueLink()
                 {
                     LinkType = linkType,
-                    RepoOwner = string.IsNullOrEmpty(owner) ? repo.Owner : owner,
-                    RepoName = string.IsNullOrEmpty(repoName) ? repo.Name : repoName,
+                    TargetRepository = targetRepo,
                     Number = number
                 };
                 Db.IssueLinks.Add(link);
                 model.OutboundLinks.Add(link);
             }
 
-            _issueCache[model.GitHubId] = model;
+            _issueCache[model.GitHubId!.Value] = model;
             return model;
         }
 
@@ -203,19 +239,23 @@ namespace HubSync.Synchronization
         // * 'owner/repo#1234' - Cross-repo short-form links
         // * 'http://github.com/owner/repo/issues/1234/' - URL-based links (also supports HTTPS and "www." prefix as well as the optional trailing '/')
         private static readonly Regex _issueLinkScanner = new Regex(
-            @"^(?<linkType>[^\s]+)\s+((https?://(www\.)?github.com/(?<owner>[a-zA-Z0-9-_]+)/(?<repo>[a-zA-Z0-9-_]+)/issues/(?<number>[0-9]+)/?)|(((?<owner>[a-zA-Z0-9-_]+ )/(?<repo>[a-zA-Z0-9-_]+))?#(?<number>[0-9]+)))\s*$",
+            @"^(?<linkType>[A-Za-z]+)\s*:?\s+((https?://(www\.)?github.com/(?<owner>[a-zA-Z0-9-_]+)/(?<repo>[a-zA-Z0-9-_]+)/issues/(?<number>[0-9]+)/?)|(((?<owner>[a-zA-Z0-9-_]+ )/(?<repo>[a-zA-Z0-9-_]+))?#(?<number>[0-9]+)))\s*$",
             RegexOptions.Multiline);
         private IEnumerable<(string LinkType, string Owner, string RepoName, int Number)> ScanForLinks(string body)
         {
-            // Ahh, ye olde implementors of IEnumerable (non-generic)
-            var matches = _issueLinkScanner.Matches(body).Cast<Match>();
-            foreach (var match in matches)
+            if (!string.IsNullOrEmpty(body))
             {
-                var linkType = match.Groups["linkType"].Value;
-                var owner = match.Groups["owner"].Value;
-                var repoName = match.Groups["repo"].Value;
-                var number = int.Parse(match.Groups["number"].Value);
-                yield return (linkType, owner, repoName, number);
+                // Ahh, ye olde implementors of IEnumerable (non-generic)
+                var matches = _issueLinkScanner.Matches(body).Cast<Match>();
+                foreach (var match in matches)
+                {
+                    // Normalize the link type to lower-case
+                    var linkType = match.Groups["linkType"].Value.ToLowerInvariant();
+                    var owner = match.Groups["owner"].Value;
+                    var repoName = match.Groups["repo"].Value;
+                    var number = int.Parse(match.Groups["number"].Value);
+                    yield return (linkType, owner, repoName, number);
+                }
             }
         }
 
@@ -315,13 +355,17 @@ namespace HubSync.Synchronization
 
             _logger.LogDebug("Setting current water mark to {WaterMark}", waterMark.ToLocalTime());
 
+            // Get rate limit info
+            var rateLimits = await GitHub.Miscellaneous.GetRateLimits();
+
             // Create a sync log entry
             var nextLog = new SyncLogEntry()
             {
                 Repository = repo,
                 User = user.Login,
                 Started = syncStart,
-                WaterMark = waterMark
+                WaterMark = waterMark,
+                StartRateLimit = rateLimits.Resources.Core.Remaining,
             };
 
             // Save to the database

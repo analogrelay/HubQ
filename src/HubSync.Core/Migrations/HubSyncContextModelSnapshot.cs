@@ -27,7 +27,7 @@ namespace HubSync.Migrations
 
                     b.Property<string>("AvatarUrl");
 
-                    b.Property<long>("GitHubId");
+                    b.Property<long?>("GitHubId");
 
                     b.Property<string>("Login")
                         .IsRequired();
@@ -37,7 +37,8 @@ namespace HubSync.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("GitHubId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[GitHubId] IS NOT NULL");
 
                     b.ToTable("Actors");
                 });
@@ -59,7 +60,7 @@ namespace HubSync.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt");
 
-                    b.Property<long>("GitHubId");
+                    b.Property<long?>("GitHubId");
 
                     b.Property<bool>("Locked");
 
@@ -83,7 +84,8 @@ namespace HubSync.Migrations
                     b.HasIndex("AuthorId");
 
                     b.HasIndex("GitHubId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[GitHubId] IS NOT NULL");
 
                     b.HasIndex("MilestoneId");
 
@@ -131,19 +133,13 @@ namespace HubSync.Migrations
 
                     b.Property<int>("Number");
 
-                    b.Property<string>("RepoName")
-                        .IsRequired();
-
-                    b.Property<string>("RepoOwner")
-                        .IsRequired();
-
-                    b.Property<int?>("TargetId");
+                    b.Property<int>("RepositoryId");
 
                     b.HasKey("Id");
 
                     b.HasIndex("IssueId");
 
-                    b.HasIndex("TargetId");
+                    b.HasIndex("RepositoryId");
 
                     b.ToTable("IssueLinks");
                 });
@@ -205,7 +201,7 @@ namespace HubSync.Migrations
                         .ValueGeneratedOnAdd()
                         .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
-                    b.Property<long>("GitHubId");
+                    b.Property<long?>("GitHubId");
 
                     b.Property<string>("Name")
                         .IsRequired();
@@ -218,7 +214,8 @@ namespace HubSync.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("GitHubId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[GitHubId] IS NOT NULL");
 
                     b.ToTable("Repositories");
                 });
@@ -231,7 +228,11 @@ namespace HubSync.Migrations
 
                     b.Property<DateTimeOffset?>("Completed");
 
+                    b.Property<int?>("EndRateLimit");
+
                     b.Property<int>("RepositoryId");
+
+                    b.Property<int>("StartRateLimit");
 
                     b.Property<DateTimeOffset>("Started");
 
@@ -325,9 +326,10 @@ namespace HubSync.Migrations
                         .HasForeignKey("IssueId")
                         .OnDelete(DeleteBehavior.Cascade);
 
-                    b.HasOne("HubSync.Models.Issue", "Target")
-                        .WithMany("InboundLinks")
-                        .HasForeignKey("TargetId");
+                    b.HasOne("HubSync.Models.Repository", "TargetRepository")
+                        .WithMany()
+                        .HasForeignKey("RepositoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("HubSync.Models.Label", b =>

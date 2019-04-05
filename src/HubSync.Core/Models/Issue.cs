@@ -27,7 +27,6 @@ namespace HubSync.Models
         public virtual IList<IssueAssignee>? Assignees { get; set; }
         public virtual IList<IssueLabel>? Labels { get; set; }
         public virtual IList<IssueLink>? OutboundLinks { get; set; }
-        public virtual IList<IssueLink>? InboundLinks { get; set; }
 
         internal void UpdateFrom(Octokit.Issue issue)
         {
@@ -35,8 +34,8 @@ namespace HubSync.Models
             NodeId = issue.NodeId;
 
             Number = issue.Number;
-            Title = issue.Title;
-            Body = issue.Body;
+            Title = issue.Title ?? string.Empty;
+            Body = issue.Body ?? string.Empty;
             State = issue.State.Value;
             Locked = issue.Locked;
             CommentCount = issue.Comments;

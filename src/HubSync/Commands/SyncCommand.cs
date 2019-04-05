@@ -101,6 +101,64 @@ namespace HubSync.Commands
 
             var context = await syncManager.CreateSyncContextAsync(repoModel, actor);
 
+            await SyncLabelsAsync(syncManager, context);
+            await SyncMilestonesAsync(syncManager, context);
+            await SyncIssuesAsync(syncManager, context);
+
+            // Complete the sync
+            await context.CompleteAsync();
+
+            return true;
+        }
+
+        private async Task SyncMilestonesAsync(SyncManager syncManager, SyncContext context)
+        {
+            var milestones = context.GetMilestones();
+            IReadOnlyList<Octokit.Milestone> milestonePage;
+            var stopwatch = new Stopwatch();
+            while((milestonePage = await milestones.NextPageAsync()).Any())
+            {
+                _logger.LogInformation("Syncing page of {Count} milestones...", milestonePage.Count);
+
+                foreach(var milestone in milestonePage)
+                {
+                    await syncManager.SyncMilestoneAsync(context.Repo, milestone);
+                }
+
+                _logger.LogDebug("Saving changes to the database...");
+                stopwatch.Restart();
+                await syncManager.SaveChangesAsync();
+                stopwatch.Stop();
+                _logger.LogInformation("Synced {Count} milestones in {Elapsed}ms.", milestonePage.Count, stopwatch.ElapsedMilliseconds);
+                _logger.LogDebug("Current memory usage {FormattedMemoryUsage}", FormatSize(GC.GetTotalMemory(forceFullCollection: false)));
+            }
+        }
+
+        private async Task SyncLabelsAsync(SyncManager syncManager, SyncContext context)
+        {
+            var labels = context.GetLabels();
+            IReadOnlyList<Octokit.Label> labelPage;
+            var stopwatch = new Stopwatch();
+            while((labelPage = await labels.NextPageAsync()).Any())
+            {
+                _logger.LogInformation("Syncing page of {Count} labels...", labelPage.Count);
+
+                foreach(var label in labelPage)
+                {
+                    await syncManager.SyncLabelAsync(context.Repo, label);
+                }
+
+                _logger.LogDebug("Saving changes to the database...");
+                stopwatch.Restart();
+                await syncManager.SaveChangesAsync();
+                stopwatch.Stop();
+                _logger.LogInformation("Synced {Count} labels in {Elapsed}ms.", labelPage.Count, stopwatch.ElapsedMilliseconds);
+                _logger.LogDebug("Current memory usage {FormattedMemoryUsage}", FormatSize(GC.GetTotalMemory(forceFullCollection: false)));
+            }
+        }
+
+        private async Task SyncIssuesAsync(SyncManager syncManager, SyncContext context)
+        {
             var issues = context.GetIssues();
             IReadOnlyList<Octokit.Issue> issuePage;
             var stopwatch = new Stopwatch();
@@ -108,7 +166,7 @@ namespace HubSync.Commands
             {
                 _logger.LogInformation("Syncing page of {Count} issues...", issuePage.Count);
 
-                foreach(var issue in issuePage)
+                foreach (var issue in issuePage)
                 {
                     await syncManager.SyncIssueAsync(context.Repo, issue);
                 }
@@ -120,11 +178,6 @@ namespace HubSync.Commands
                 _logger.LogInformation("Synced {Count} issues in {Elapsed}ms.", issuePage.Count, stopwatch.ElapsedMilliseconds);
                 _logger.LogDebug("Current memory usage {FormattedMemoryUsage}", FormatSize(GC.GetTotalMemory(forceFullCollection: false)));
             }
-
-            // Complete the sync
-            await context.CompleteAsync();
-
-            return true;
         }
 
         private string FormatSize(long bytes)
