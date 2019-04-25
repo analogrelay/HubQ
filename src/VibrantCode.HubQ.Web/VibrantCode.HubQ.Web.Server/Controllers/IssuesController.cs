@@ -10,7 +10,7 @@ namespace VibrantCode.HubQ.Web.Server.Controllers
         [HttpGet]
         public async Task<ActionResult> GetAsync()
         {
-            return Content("It works");
+            
         }
     }
 }
