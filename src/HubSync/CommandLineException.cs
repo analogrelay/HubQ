@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-namespace HubSync
+namespace VibrantCode.HubQ.SyncTool
 {
     [Serializable]
     internal class CommandLineException : Exception

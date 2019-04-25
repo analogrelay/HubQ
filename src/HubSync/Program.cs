@@ -2,12 +2,12 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using HubSync.Commands;
+using VibrantCode.HubQ.SyncTool.Commands;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace HubSync
+namespace VibrantCode.HubQ.SyncTool
 {
     [Command("hubsync", Description = "GitHub Issue Synchronizer")]
     [Subcommand(typeof(InitCommand))]

@@ -1,9 +1,9 @@
-﻿using HubSync.Models;
+﻿using VibrantCode.HubQ.Data;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace HubSync.Commands
+namespace VibrantCode.HubQ.SyncTool.Commands
 {
     public abstract class DatabaseCommandBase
     {

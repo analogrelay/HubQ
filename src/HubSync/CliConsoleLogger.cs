@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Extensions.Logging;
 
-namespace HubSync
+namespace VibrantCode.HubQ.SyncTool
 {
     internal class CliConsoleLoggerProvider : ILoggerProvider
     {

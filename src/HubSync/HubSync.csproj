@@ -6,6 +6,7 @@
     <LangVersion>8.0</LangVersion>
     <NullableContextOptions>enable</NullableContextOptions>
     <WarningsAsErrors>true</WarningsAsErrors>
+    <RootNamespace>VibrantCode.HubQ.SyncTool</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\HubSync.Core\HubSync.Core.csproj" />
+    <ProjectReference Include="..\VibrantCode.HubQ\VibrantCode.HubQ.csproj" />
   </ItemGroup>
 
 </Project>

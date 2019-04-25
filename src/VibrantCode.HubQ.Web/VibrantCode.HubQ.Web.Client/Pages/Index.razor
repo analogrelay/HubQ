@@ -1,0 +1,11 @@
+﻿@page "/"
+
+@functions {
+    private IndexViewModel ViewModel { get; set; } = new IndexViewModel();
+}
+
+<div class="container">
+    <h1>Issues</h1>
+
+    <IssueList Issues="@ViewModel.Issues" />
+</div>

@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Octokit;
 using Octokit.Internal;
 
-namespace HubSync
+namespace VibrantCode.HubQ.SyncTool
 {
     internal class LoggingHttpClient : IHttpClient
     {

@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace HubSync
+namespace VibrantCode.HubQ.SyncTool
 {
     public struct RepositoryReference
     {
@@ -20,7 +20,7 @@ namespace HubSync
         public static bool TryParse(string reference, out RepositoryReference result)
         {
             var match = _repoParser.Match(reference);
-            if(match.Success)
+            if (match.Success)
             {
                 result = new RepositoryReference(
                     match.Groups["owner"].Value,

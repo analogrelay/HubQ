@@ -3,7 +3,7 @@ using McMaster.Extensions.CommandLineUtils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace HubSync.Commands
+namespace VibrantCode.HubQ.SyncTool.Commands
 {
     [Command("init", Description = "Initializes a new HubSync database.")]
     public class InitCommand : DatabaseCommandBase
@@ -25,7 +25,7 @@ namespace HubSync.Commands
 
             // Run the migrations
             _logger.LogInformation("Creating Database...");
-            await context.Database.MigrateAsync();
+            await context.Database.EnsureCreatedAsync();
 
             return 0;
         }

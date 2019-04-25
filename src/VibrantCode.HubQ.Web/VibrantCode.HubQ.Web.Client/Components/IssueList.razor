@@ -1,0 +1,46 @@
+﻿@functions {
+    private bool _selectAll;
+
+    [Parameter]
+    private IReadOnlyList<IssueListItem> Issues { get; set; }
+
+    private bool SelectAll
+    {
+        get => _selectAll;
+        set
+        {
+            _selectAll = value;
+            UpdateSelection(_selectAll);
+        }
+    }
+
+    private void UpdateSelection(bool selected)
+    {
+        foreach (var issue in Issues)
+        {
+            issue.Selected = selected;
+        }
+    }
+}
+
+<table class="table table-hover table-sm">
+    <thead>
+        <tr>
+            <td class="autosize"><input type="checkbox" bind="@SelectAll" /></td>
+            <th scope="col" class="autosize">Repository</th>
+            <th scope="col" class="autosize">#</th>
+            <th scope="col">Title</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var issue in Issues)
+        {
+            <tr>
+                <td><input type="checkbox" bind="@issue.Selected" /></td>
+                <td>@issue.Repository</td>
+                <td>@issue.Number</td>
+                <td><a href="/issues/@issue.Id">@issue.Title</a></td>
+            </tr>
+        }
+    </tbody>
+</table>

@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using HubSync.Synchronization;
+using VibrantCode.HubQ.Synchronization;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Octokit;
 
-namespace HubSync.Commands
+namespace VibrantCode.HubQ.SyncTool.Commands
 {
     [Command("sync", Description = "Synchronizes the specified repositories to the database.")]
     public class SyncCommand : DatabaseCommandBase
@@ -116,11 +116,11 @@ namespace HubSync.Commands
             var milestones = context.GetMilestones();
             IReadOnlyList<Octokit.Milestone> milestonePage;
             var stopwatch = new Stopwatch();
-            while((milestonePage = await milestones.NextPageAsync()).Any())
+            while ((milestonePage = await milestones.NextPageAsync()).Any())
             {
                 _logger.LogInformation("Syncing page of {Count} milestones...", milestonePage.Count);
 
-                foreach(var milestone in milestonePage)
+                foreach (var milestone in milestonePage)
                 {
                     await syncManager.SyncMilestoneAsync(context.Repo, milestone);
                 }
@@ -139,11 +139,11 @@ namespace HubSync.Commands
             var labels = context.GetLabels();
             IReadOnlyList<Octokit.Label> labelPage;
             var stopwatch = new Stopwatch();
-            while((labelPage = await labels.NextPageAsync()).Any())
+            while ((labelPage = await labels.NextPageAsync()).Any())
             {
                 _logger.LogInformation("Syncing page of {Count} labels...", labelPage.Count);
 
-                foreach(var label in labelPage)
+                foreach (var label in labelPage)
                 {
                     await syncManager.SyncLabelAsync(context.Repo, label);
                 }
@@ -182,7 +182,7 @@ namespace HubSync.Commands
 
         private string FormatSize(long bytes)
         {
-            if(bytes / 1024 < 5)
+            if (bytes / 1024 < 5)
             {
                 return $"{bytes} bytes";
             }
