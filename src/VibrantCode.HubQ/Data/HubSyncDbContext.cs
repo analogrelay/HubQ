@@ -4,7 +4,7 @@ using Octokit;
 
 namespace VibrantCode.HubQ.Data
 {
-    public class HubSyncContext : DbContext
+    public class HubSyncDbContext : DbContext
     {
         public static readonly string LocalConnectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=HubSync;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
 
@@ -21,7 +21,7 @@ namespace VibrantCode.HubQ.Data
         public DbSet<PullRequest> PullRequests { get; set; } = null!;
         public DbSet<Team> Teams { get; set; } = null!;
 
-        public HubSyncContext(DbContextOptions options) : base(options)
+        public HubSyncDbContext(DbContextOptions options) : base(options)
         {
         }
 

@@ -17,7 +17,7 @@ namespace VibrantCode.HubQ.Synchronization
         private static readonly IEqualityComparer<(string, string)> _pairwiseIgnoreCaseComparer =
             ValueTupleEqualityComparer.Create(StringComparer.OrdinalIgnoreCase, StringComparer.OrdinalIgnoreCase);
 
-        public HubSyncContext Db { get; }
+        public HubSyncDbContext Db { get; }
         public GitHubClient GitHub { get; }
 
         private Dictionary<string, Actor> _actorCache = new Dictionary<string, Actor>(StringComparer.OrdinalIgnoreCase);
@@ -29,7 +29,7 @@ namespace VibrantCode.HubQ.Synchronization
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<SyncManager> _logger;
 
-        public SyncManager(HubSyncContext db, GitHubClient github, ILoggerFactory loggerFactory)
+        public SyncManager(HubSyncDbContext db, GitHubClient github, ILoggerFactory loggerFactory)
         {
             Db = db;
             GitHub = github;

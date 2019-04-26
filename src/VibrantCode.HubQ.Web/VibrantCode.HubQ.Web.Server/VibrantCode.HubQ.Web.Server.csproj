@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\VibrantCode.HubQ\VibrantCode.HubQ.csproj" />
     <ProjectReference Include="..\VibrantCode.HubQ.Web.Client\VibrantCode.HubQ.Web.Client.csproj" />
     <ProjectReference Include="..\VibrantCode.HubQ.Web.Shared\VibrantCode.HubQ.Web.Shared.csproj" />
   </ItemGroup>

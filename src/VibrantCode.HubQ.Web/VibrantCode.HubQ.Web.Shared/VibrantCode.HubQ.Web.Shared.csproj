@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>VibrantCode.HubQ.Web</RootNamespace>
   </PropertyGroup>
 
 </Project>

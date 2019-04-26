@@ -19,7 +19,7 @@ namespace VibrantCode.HubQ.SyncTool.Commands
             LoggerFactory = loggerFactory;
         }
 
-        internal HubSyncContext CreateDbContext()
+        internal HubSyncDbContext CreateDbContext()
         {
             if (SqlLocalDb)
             {
@@ -28,7 +28,7 @@ namespace VibrantCode.HubQ.SyncTool.Commands
                     throw new CommandLineException("Cannot specify both '--mssql' and '--mssql-local' options.");
                 }
 
-                SqlConnectionString = HubSyncContext.LocalConnectionString;
+                SqlConnectionString = HubSyncDbContext.LocalConnectionString;
             }
 
             if (string.IsNullOrEmpty(SqlConnectionString))
@@ -40,7 +40,7 @@ namespace VibrantCode.HubQ.SyncTool.Commands
                 .UseSqlServer(SqlConnectionString)
                 .UseLoggerFactory(LoggerFactory)
                 .Options;
-            return new HubSyncContext(options);
+            return new HubSyncDbContext(options);
         }
     }
 }
