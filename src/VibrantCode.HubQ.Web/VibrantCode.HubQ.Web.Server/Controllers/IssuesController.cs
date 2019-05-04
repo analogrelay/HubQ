@@ -20,17 +20,25 @@ namespace VibrantCode.HubQ.Web.Server.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<IssueResponse>>> GetAsync()
+        public async Task<ActionResult<IEnumerable<PagedResponse<IssueResponse>>>> GetAsync(int pageNumber = 1, int pageSize = 25)
         {
-            return await _db.Issues
-                .Take(10)
-                .Select(i => new IssueResponse()
-                {
-                    Id = i.Id,
-                    Repository = $"{i.Repository!.Owner}/{i.Repository!.Name}",
-                    Number = i.Number,
-                    Title = i.Title!,
-                }).ToListAsync();
+
+            return Json(new PagedResponse<IssueResponse>()
+            {
+                Links = Hyperlinks.GeneratePagingLinks(o => Url.Action("Get", "Issues", o), pageNumber, pageSize),
+                Data = await _db.Issues
+                    .OrderByDescending(i => i.UpdatedAt)
+                    .Where(i => !i.IsPullRequest)
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(i => new IssueResponse()
+                    {
+                        Id = i.Id,
+                        Repository = $"{i.Repository!.Owner}/{i.Repository!.Name}",
+                        Number = i.Number,
+                        Title = i.Title!,
+                    }).ToListAsync()
+            });
         }
     }
 }

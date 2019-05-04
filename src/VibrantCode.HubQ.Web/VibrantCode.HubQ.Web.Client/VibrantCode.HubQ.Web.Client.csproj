@@ -13,9 +13,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Blazor" Version="3.0.0-preview4-19216-03" />
     <PackageReference Include="Microsoft.AspNetCore.Blazor.Build" Version="3.0.0-preview4-19216-03" PrivateAssets="all" />
+    <PackageReference Include="System.Collections.Immutable" Version="1.6.0-preview4.19212.13" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Nux.Blazor\Nux.Blazor.csproj" />
     <ProjectReference Include="..\VibrantCode.HubQ.Web.Shared\VibrantCode.HubQ.Web.Shared.csproj" />
   </ItemGroup>
 

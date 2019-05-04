@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Components.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Nux;
+using VibrantCode.HubQ.Web.Client.State;
 
 namespace VibrantCode.HubQ.Web.Client
 {
@@ -7,6 +9,7 @@ namespace VibrantCode.HubQ.Web.Client
     {
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddNux<AppState, AppReducer>();
         }
 
         public void Configure(IComponentsApplicationBuilder app)

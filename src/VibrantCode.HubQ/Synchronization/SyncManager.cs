@@ -246,17 +246,17 @@ namespace VibrantCode.HubQ.Synchronization
                 model.OutboundLinks.Clear();
             }
 
-            foreach (var (linkType, owner, repoName, number) in ScanForLinks(issue.Body))
+            foreach (var parsedLink in ScanForLinks(issue.Body))
             {
-                var targetRepo = (string.IsNullOrEmpty(owner) && string.IsNullOrEmpty(repoName)) ?
+                var targetRepo = (string.IsNullOrEmpty(parsedLink.Owner) && string.IsNullOrEmpty(parsedLink.RepoName)) ?
                     repo :
-                    await SyncRepoAsync(owner, repoName);
+                    await SyncRepoAsync(parsedLink.Owner, parsedLink.RepoName);
 
                 var link = new IssueLink()
                 {
-                    LinkType = linkType,
+                    LinkType = parsedLink.LinkType,
                     TargetRepository = targetRepo,
-                    Number = number
+                    Number = parsedLink.Number,
                 };
                 Db.IssueLinks.Add(link);
                 model.OutboundLinks.Add(link);
@@ -274,7 +274,7 @@ namespace VibrantCode.HubQ.Synchronization
         private static readonly Regex _issueLinkScanner = new Regex(
             @"^(?<linkType>[A-Za-z]+)\s*:?\s+((https?://(www\.)?github.com/(?<owner>[a-zA-Z0-9-_]+)/(?<repo>[a-zA-Z0-9-_]+)/issues/(?<number>[0-9]+)/?)|(((?<owner>[a-zA-Z0-9-_]+ )/(?<repo>[a-zA-Z0-9-_]+))?#(?<number>[0-9]+)))\s*$",
             RegexOptions.Multiline);
-        private IEnumerable<(string LinkType, string Owner, string RepoName, int Number)> ScanForLinks(string body)
+        private IEnumerable<ParsedIssueLink> ScanForLinks(string body)
         {
             if (!string.IsNullOrEmpty(body))
             {
@@ -287,7 +287,7 @@ namespace VibrantCode.HubQ.Synchronization
                     var owner = match.Groups["owner"].Value;
                     var repoName = match.Groups["repo"].Value;
                     var number = int.Parse(match.Groups["number"].Value);
-                    yield return (linkType, owner, repoName, number);
+                    yield return new ParsedIssueLink(linkType, owner, repoName, number);
                 }
             }
         }
@@ -407,6 +407,22 @@ namespace VibrantCode.HubQ.Synchronization
             _logger.LogDebug("Sync #{Id} has started...", nextLog.Id);
 
             return new SyncContext(this, _loggerFactory.CreateLogger<SyncContext>(), repo, user, nextLog, lastSyncStart);
+        }
+
+        private struct ParsedIssueLink
+        {
+            public ParsedIssueLink(string linkType, string owner, string repoName, int number)
+            {
+                LinkType = linkType;
+                Owner = owner;
+                RepoName = repoName;
+                Number = number;
+            }
+
+            public string LinkType { get; }
+            public string Owner { get; }
+            public string RepoName { get; }
+            public int Number { get; }
         }
     }
 }
