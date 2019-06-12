@@ -28,6 +28,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nux", "src\Nux\Nux.csproj",
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nux.Blazor", "src\Nux.Blazor\Nux.Blazor.csproj", "{B7A88217-6DC8-49AE-BE88-6843E745287D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VibrantCode.HubQ.Web", "src\VibrantCode.HubQ.Web\VibrantCode.HubQ.Web.csproj", "{ED9714A3-8CB4-4FDB-9635-B28D4D978970}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -122,6 +124,18 @@ Global
 		{B7A88217-6DC8-49AE-BE88-6843E745287D}.Release|x64.Build.0 = Release|Any CPU
 		{B7A88217-6DC8-49AE-BE88-6843E745287D}.Release|x86.ActiveCfg = Release|Any CPU
 		{B7A88217-6DC8-49AE-BE88-6843E745287D}.Release|x86.Build.0 = Release|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Debug|x64.Build.0 = Debug|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Debug|x86.Build.0 = Debug|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Release|x64.ActiveCfg = Release|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Release|x64.Build.0 = Release|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Release|x86.ActiveCfg = Release|Any CPU
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -135,6 +149,7 @@ Global
 		{D6CF0A72-CB24-414D-9278-4B645DB5EA24} = {39478992-64BC-4FCC-B7A7-803AB9BC6545}
 		{FF57A28B-DEC6-47E9-A5A4-AC68E7FA6FC3} = {DFC04D51-FC26-4262-A967-CCB364BC16EC}
 		{B7A88217-6DC8-49AE-BE88-6843E745287D} = {DFC04D51-FC26-4262-A967-CCB364BC16EC}
+		{ED9714A3-8CB4-4FDB-9635-B28D4D978970} = {DFC04D51-FC26-4262-A967-CCB364BC16EC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F88472FD-63E6-402E-B8A0-8A48857F219E}
