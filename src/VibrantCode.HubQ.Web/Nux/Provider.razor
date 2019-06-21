@@ -1,0 +1,20 @@
+@typeparam TState
+@inject StoreFactory<TState> StoreFactory
+
+@{ 
+    if(InitialState == null)
+    {
+        throw new InvalidOperationException("InitialState must be specified!");
+    }
+    var store = StoreFactory.CreateStore(InitialState);
+}
+
+<CascadingValue Value="store">
+    @ChildContent
+</CascadingValue>
+
+@code
+{
+    [Parameter] TState InitialState { get; set; } = default!;
+    [Parameter] RenderFragment? ChildContent { get; set; }
+}

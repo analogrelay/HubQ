@@ -1,5 +1,19 @@
-﻿@*
-    The Router component displays whichever component has a @page
-    directive matching the current URI.
-*@
-<Router AppAssembly="typeof(Startup).Assembly" />
+﻿@{
+    // Just use the InitialState parameter to initialize the store
+    var initialState = InitialState;
+    InitialState = null;
+}
+
+<Provider InitialState="initialState">
+    <CascadingAuthenticationState>
+        <Router AppAssembly="typeof(Startup).Assembly">
+            <NotFoundContent>
+                <p>Not found!</p>
+            </NotFoundContent>
+        </Router>
+    </CascadingAuthenticationState>
+</Provider>
+
+@code {
+    [Parameter] ApplicationState? InitialState { get; set; }
+}

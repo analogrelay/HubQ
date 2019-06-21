@@ -1,7 +1,6 @@
 ﻿<Project>
   <PropertyGroup>
     <LangVersion>preview</LangVersion>
-    <NullableContextOptions>enable</NullableContextOptions>
-    <WarningsAsErrors>true</WarningsAsErrors>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 </Project>
