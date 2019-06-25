@@ -10,11 +10,11 @@
 }
 
 <CascadingValue Value="store">
-    @ChildContent
+    @ChildContent(store)
 </CascadingValue>
 
-@code
+@functions
 {
     [Parameter] TState InitialState { get; set; } = default!;
-    [Parameter] RenderFragment? ChildContent { get; set; }
+    [Parameter] RenderFragment<Store<TState>>? ChildContent { get; set; }
 }

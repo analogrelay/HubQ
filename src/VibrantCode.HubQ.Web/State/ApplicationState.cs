@@ -1,16 +1,23 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace VibrantCode.HubQ.Web.State
 {
     public class ApplicationState
     {
-        public ApplicationState(AuthenticationState authentication, QueuesState queues)
+        // Initial State initialization
+        public ApplicationState(string? githubToken)
+            : this(githubToken, new QueuesState(isLoading: false, Array.Empty<QueueModel>()))
         {
-            Authentication = authentication;
+        }
+
+        public ApplicationState(string? githubToken, QueuesState queues)
+        {
+            GitHubToken = githubToken;
             Queues = queues;
         }
 
-        public AuthenticationState Authentication { get; }
+        public string? GitHubToken { get; }
         public QueuesState Queues { get; }
     }
 
@@ -23,26 +30,20 @@ namespace VibrantCode.HubQ.Web.State
         }
 
         public bool IsLoading { get; }
-        public IReadOnlyList<QueueModel> Queues { get;}
+        public IReadOnlyList<QueueModel> Queues { get; }
     }
 
     public class QueueModel
     {
-        public QueueModel(string name)
+        public QueueModel(string name, string url, IReadOnlyList<QueueModel> children)
         {
             Name = name;
+            Url = url;
+            Children = children;
         }
 
         public string Name { get; }
-    }
-
-    public class AuthenticationState
-    {
-        public AuthenticationState(string? gitHubToken)
-        {
-            GitHubToken = gitHubToken;
-        }
-
-        public string? GitHubToken { get; }
+        public string Url { get; }
+        public IReadOnlyList<QueueModel> Children { get; }
     }
 }

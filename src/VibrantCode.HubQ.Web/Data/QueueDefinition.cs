@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
-namespace VibrantCode.HubQ.Web.Data
+﻿namespace VibrantCode.HubQ.Web.Data
 {
-    public class QueueDefinition
+    public class QueueDefinition: QueueGroupEntry
     {
         public QueueDefinition(string name, string query)
         {
@@ -13,7 +8,7 @@ namespace VibrantCode.HubQ.Web.Data
             Query = query;
         }
 
-        public string Name { get; }
+        public override string Name { get; }
         public string Query { get; }
     }
 }

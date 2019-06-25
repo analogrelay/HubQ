@@ -1,4 +1,8 @@
-@inject Microsoft.AspNetCore.Components.IUriHelper UriHelper
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
+    [Parameter] private IReadOnlyList<QueueModel>? Queues { get; set; }
+}
+
 
 <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
     <div class="container">
@@ -12,6 +16,17 @@
                 <li class="nav-item">
                     <NavLink href="/" ActiveClass="active" class="nav-link text-dark">Home</NavLink>
                 </li>
+                <AuthorizeView>
+                    <Authorized>
+                        <li class="nav-item">
+                            <NavLink href="/Queues" ActiveClass="active" class="nav-link text-dark">Queues</NavLink>
+                            @if (Queues?.Any() ?? false)
+                            {
+                                <QueuesList Queues="Queues" />
+                            }
+                        </li>
+                    </Authorized>
+                </AuthorizeView>
                 <li class="nav-item">
                     <NavLink href="/Privacy" ActiveClass="active" class="nav-link text-dark">Privacy</NavLink>
                 </li>

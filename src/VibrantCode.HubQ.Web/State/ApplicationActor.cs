@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace VibrantCode.HubQ.Web.Data
+namespace VibrantCode.HubQ.Web.State
 {
-    public interface IDataService
+    public class ApplicationActor
     {
-        Task<QueueGroup> GetRootGroupAsync();
     }
 }

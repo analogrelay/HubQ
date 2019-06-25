@@ -13,13 +13,13 @@ namespace VibrantCode.HubQ.Web.Nux
     {
         private TState _state;
         private readonly IReducer<TState> _reducer;
-        private readonly Action<Store<TState>, IAction, Action<IAction>> _compiledMiddleware;
+        private readonly Action<IStoreDispatcher, IAction, Action<IAction>> _compiledMiddleware;
         private readonly IEqualityComparer<TState> _equalityComparer;
         private readonly ILogger _logger;
 
         public event EventHandler? StateChanged;
 
-        public Store(TState initialState, IReducer<TState> reducer, Func<Store<TState>, IAction, IAction> compiledMiddleware, IEqualityComparer<TState> equalityComparer, ILogger logger)
+        public Store(TState initialState, IReducer<TState> reducer, Action<IStoreDispatcher, IAction, Action<IAction>> compiledMiddleware, IEqualityComparer<TState> equalityComparer, ILogger logger)
         {
             _state = initialState;
             _reducer = reducer;
@@ -38,39 +38,22 @@ namespace VibrantCode.HubQ.Web.Nux
         /// <param name="action">The action to dispatch.</param>
         public void Dispatch(IAction action)
         {
-            _logger.LogDebug("Reducing state based on action: {Action}", action);
-            var newState = _reducer.Reduce(_state, action);
-            if(_equalityComparer.Equals(newState, _state))
+            _logger.LogDebug("Running middleware...");
+            _compiledMiddleware(this, action, (finalAction) =>
             {
-                _logger.LogDebug("State did not change.");
-            }
-            else
-            {
-                _logger.LogDebug("State changed, triggering update.");
-                StateChanged?.Invoke(this, EventArgs.Empty);
-            }
+                _logger.LogDebug("Reducing state based on action: {Action}", action);
+                var newState = _reducer.Reduce(_state, action);
+                if(_equalityComparer.Equals(newState, _state))
+                {
+                    _logger.LogDebug("State did not change.");
+                }
+                else
+                {
+                    _state = newState;
+                    _logger.LogDebug("State changed, triggering update.");
+                    StateChanged?.Invoke(this, EventArgs.Empty);
+                }
+            });
         }
-
-        /// <summary>
-        /// Dispatch using an action creator. The provided function will be executed and provided with
-        /// a <see cref="IStoreDispatcher"/> which can be used to dispatch actions to update state as the async
-        /// operation progresses.
-        /// </summary>
-        /// <param name="actionCreator">A function that recieves an <see cref="IStoreDispatcher"/>.</param>
-        public void Dispatch(Action<IStoreDispatcher> actionCreator) 
-            => actionCreator(this);
-
-        /// <summary>
-        /// Dispatch using an action creator. The provided function will be executed and provided with
-        /// a <see cref="IStoreDispatcher"/> which can be used to dispatch actions to update state as the async
-        /// operation progresses.
-        /// </summary>
-        /// <remarks>
-        /// The <see cref="Task"/> returned by the creator is ignored, this overload is just used to allow the use
-        /// of `async Task` methods.
-        /// </remarks>
-        /// <param name="actionCreator">A asynchronous function that recieves an <see cref="IStoreDispatcher"/>.</param>
-        public void Dispatch(Func<IStoreDispatcher, Task> actionCreator)
-            => _ = actionCreator(this);
     }
 }

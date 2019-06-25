@@ -8,16 +8,26 @@ namespace VibrantCode.HubQ.Web.Data
         private const string AllRepos = "repo:aspnet/AspNetCore repo:aspnet/Extensions repo:aspnet/AspNetCore-Tooling";
         private const string OpenIssues = "is:issue is:open";
 
-        private static readonly IReadOnlyList<QueueDefinition> _queues = new[]
-        {
-            new QueueDefinition("SignalR/Triage", TriageQuery("area-signalr")),
-            new QueueDefinition("Servers/Triage", TriageQuery("area-servers")),
-            new QueueDefinition("Hosting/Triage", TriageQuery("area-hosting")),
-        };
+        private static readonly QueueGroup _root = new QueueGroup(
+            name: string.Empty,
+            children: new QueueGroupEntry[]
+            {
+                new QueueGroup("SignalR", new QueueGroupEntry[]
+                {
+                    new QueueDefinition("Triage", TriageQuery("area-signalr"))
+                }),
+                new QueueGroup("Servers", new QueueGroupEntry[]
+                {
+                    new QueueDefinition("Triage", TriageQuery("area-servers"))
+                }),
+                new QueueGroup("Hosting", new QueueGroupEntry[]
+                {
+                    new QueueDefinition("Triage", TriageQuery("area-hosting"))
+                }),
+            });
 
-        public Task<IReadOnlyList<QueueDefinition>> GetQueuesAsync() => Task.FromResult(_queues);
+        public Task<QueueGroup> GetRootGroupAsync() => Task.FromResult(_root);
 
-
-        private static string TriageQuery(string area) => $"{OpenIssues} {AllRepos} label:{area}";
+        private static string TriageQuery(string area) => $"{OpenIssues} {AllRepos} label:{area} no:milestone";
     }
 }

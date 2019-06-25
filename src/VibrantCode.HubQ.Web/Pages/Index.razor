@@ -1,15 +1,5 @@
 ﻿@page "/"
 
-@code {
-    protected override void OnInit()
-    {
-        base.OnInit();
-
-        // Start loading queues
-        Store.Dispatch(Actions.LoadQueues.Instance);
-    }
-}
-
 <AuthorizeView>
     <NotAuthorized>
         <div class="jumbotron">
@@ -20,6 +10,4 @@
             <a href="/Account/Login" class="btn btn-primary btn-lg" role="button">Login</a>
         </div>
     </NotAuthorized>
-    <Authorized>
-    </Authorized>
 </AuthorizeView>

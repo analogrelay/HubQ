@@ -31,7 +31,9 @@ namespace VibrantCode.HubQ.Web
                     options.SaveTokens = true;
                 });
 
-            services.AddNuxStore<ApplicationState, ApplicationReducer>();
+            services
+                .AddNux<ApplicationState, ApplicationReducer>()
+                .AddMiddleware<ApplicationMiddleware>();
 
             services.Configure<GitHubAuthenticationOptions>(
                 GitHubAuthenticationDefaults.AuthenticationScheme,

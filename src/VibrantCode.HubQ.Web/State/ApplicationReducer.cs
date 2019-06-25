@@ -1,22 +1,18 @@
 ﻿using System;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Threading.Tasks;
-using VibrantCode.HubQ.Web.Data;
 using VibrantCode.HubQ.Web.Nux;
 
 namespace VibrantCode.HubQ.Web.State
 {
     public class ApplicationReducer : IReducer<ApplicationState>
     {
-        public ApplicationState Reduce(ApplicationState initialState, IAction action, IStoreDispatcher dispatcher)
+        public ApplicationState Reduce(ApplicationState initialState, IAction action)
         {
             return new ApplicationState(
-                initialState.Authentication,
-                ReduceQueues(initialState.Queues, action, dispatcher));
+                initialState.GitHubToken,
+                ReduceQueues(initialState.Queues, action));
         }
 
-        private QueuesState ReduceQueues(QueuesState queues, IAction action, IStoreDispatcher dispatcher)
+        private QueuesState ReduceQueues(QueuesState queues, IAction action)
         {
             return action switch
             {
