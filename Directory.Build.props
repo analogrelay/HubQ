@@ -1,6 +1,10 @@
 ﻿<Project>
   <PropertyGroup>
-    <LangVersion>preview</LangVersion>
+    <LangVersion>8.0</LangVersion>
     <Nullable>enable</Nullable>
+    <RestoreSources>
+      $(RestoreSources);
+      https://www.myget.org/F/aspnet-contrib/api/v3/index.json
+    </RestoreSources>
   </PropertyGroup>
 </Project>
