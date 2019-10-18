@@ -1,18 +1,16 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore;
+using System.Reflection;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace VibrantCode.HubQ.Web
 {
     public class Program
     {
+        private static readonly Assembly Asm = typeof(Program).Assembly;
+        public static readonly string Name = Asm.GetName().Name!;
+        public static readonly string Version =
+            Asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ??
+            Asm.GetName().Version!.ToString();
         public static void Main(string[] args)
         {
             CreateHostBuilder(args).Build().Run();

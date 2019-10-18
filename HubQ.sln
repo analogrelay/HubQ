@@ -11,12 +11,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		Directory.Build.props = Directory.Build.props
 		global.json = global.json
-		nuget.config = nuget.config
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VibrantCode.HubQ", "src\VibrantCode.HubQ\VibrantCode.HubQ.csproj", "{7DB44157-EB52-48FF-861A-DADB3E8C86F1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VibrantCode.HubQ.Web", "src\VibrantCode.HubQ.Web\VibrantCode.HubQ.Web.csproj", "{91AAF1D9-8CA4-4CE7-BD69-984CCF2A6678}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VibrantCode.HubQ.Web", "src\VibrantCode.HubQ.Web\VibrantCode.HubQ.Web.csproj", "{91AAF1D9-8CA4-4CE7-BD69-984CCF2A6678}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

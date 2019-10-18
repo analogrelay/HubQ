@@ -5,17 +5,6 @@
 </div>
 
 <div class="main">
-    <div class="top-row px-4">
-        <AuthorizeView>
-            <div class="pr-1">
-                Welcome, @context.User.Identity.Name!
-            </div>
-            <form class="form-inline" action="/logout" method="post">
-                <button class="btn btn-outline-primary" type="submit">Logout</button>
-            </form>
-        </AuthorizeView>
-    </div>
-
     <div class="content px-4">
         @Body
     </div>

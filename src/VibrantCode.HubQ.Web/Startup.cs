@@ -1,18 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using AspNet.Security.OAuth.GitHub;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
+using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using VibrantCode.HubQ.Web.Data;
 
 namespace VibrantCode.HubQ.Web
 {
@@ -30,27 +22,14 @@ namespace VibrantCode.HubQ.Web
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddRazorPages();
+            services.AddBlazoredLocalStorage();
             services.AddServerSideBlazor();
 
-            services
-                .AddAuthentication(options =>
-                {
-                    options.DefaultChallengeScheme = GitHubAuthenticationDefaults.AuthenticationScheme;
-                    options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                    options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                })
-                .AddCookie()
-                .AddGitHub(options =>
-                {
-                    options.SaveTokens = true;
-                    options.ClientId = Configuration["Auth:GitHub:ClientId"];
-                    options.ClientSecret = Configuration["Auth:GitHub:ClientSecret"];
-                });
+            services.AddMemoryCache();
 
-            services.AddAuthorization(options =>
-            {
-                options.AddPolicy(AuthPolicies.IsLoggedIn, builder => builder.RequireAuthenticatedUser());
-            });
+            services.Configure<SiteOptions>(Configuration.GetSection("Site"));
+            services.Configure<GitHubOptions>(Configuration.GetSection("GitHub"));
+            services.AddScoped<StateService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -75,25 +54,8 @@ namespace VibrantCode.HubQ.Web
             app.UseAuthentication();
             app.UseAuthorization();
 
-            app.Use(async (context, next) =>
-            {
-                var result = await context.AuthenticateAsync();
-                if(result?.Principal?.Identity?.IsAuthenticated != true)
-                {
-                    await context.ChallengeAsync();
-                }
-                await next();
-            });
-
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapPost("/logout", async context =>
-                {
-                    await context.SignOutAsync();
-
-                    // We don't support unauthenticated users, so we just have to bounce you out of the site.
-                    context.Response.Redirect("https://www.microsoft.com");
-                });
                 endpoints.MapBlazorHub();
                 endpoints.MapFallbackToPage("/_Host");
             });

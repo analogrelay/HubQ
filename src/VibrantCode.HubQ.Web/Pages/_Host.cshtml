@@ -14,9 +14,12 @@
 </head>
 <body>
     <app>
-        @(await Html.RenderComponentAsync<App>(RenderMode.ServerPrerendered))
+        @* Can't prerender because we load from local storage in OnInitialized event. *@
+        @(await Html.RenderComponentAsync<App>(RenderMode.Server))
     </app>
 
     <script src="_framework/blazor.server.js"></script>
+    <script src="~/js/jquery-3.4.1.min.js"></script>
+    <script src="~/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

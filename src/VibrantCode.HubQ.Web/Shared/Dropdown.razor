@@ -1,0 +1,63 @@
+﻿<!-- Default dropright button -->
+<div class="btn-group @GetDropsideClass(Side)">
+    <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        @if(Icon is string)
+        {
+            <span class="oi oi-@Icon"></span>
+        }
+        @(SelectedItem is string ? $"{Title}: {SelectedItem}" : Title)
+    </button>
+    <div class="dropdown-menu">
+        @if (Items is object)
+        {
+            foreach (var item in Items)
+            {
+                var activeClass = string.Equals(item, SelectedItem, StringComparison.Ordinal) ? "active" : null;
+                <a class="dropdown-item @activeClass" href="#" @onclick="@(_ => Select(item))">@item</a>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? Icon { get; set; }
+
+    [Parameter]
+    public Dropside Side { get; set; } = Dropside.Down;
+
+    [Parameter]
+    public ICollection<string>? Items { get; set; }
+
+    [Parameter]
+    public string? SelectedItem { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnSelectionChanged { get; set; }
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    private string GetDropsideClass(Dropside side) => side switch
+    {
+        Dropside.Down => "dropdown",
+        Dropside.Up => "dropup",
+        Dropside.Left => "dropleft",
+        Dropside.Right => "dropright",
+        _ => throw new ArgumentException($"Unknown Dropside value '{side}'", nameof(side)),
+    };
+
+    private async Task Select(string itemName)
+    {
+        SelectedItem = itemName;
+        await OnSelectionChanged.InvokeAsync(itemName);
+    }
+
+    public enum Dropside
+    {
+        Down,
+        Up,
+        Left,
+        Right
+    }
+}

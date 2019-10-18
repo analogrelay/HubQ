@@ -1,0 +1,57 @@
+﻿@page "/views/{ViewSlug}"
+@using Octokit
+@inject IOptions<SiteOptions> SiteOptions
+@inject NavigationManager Navigation
+
+@if (_definition == null)
+{
+    <h3>Not Found</h3>
+
+    <div class="alert alert-danger" role="alert">
+        Could not find a view named '@ViewSlug'!
+    </div>
+}
+else
+{
+    <h3>View</h3>
+
+    @if (Results == null)
+    {
+        <p>Loading...</p>
+    } else {
+        <ul>
+            @foreach (var item in Results.Items)
+            {
+                <li>
+                    @item.Number - @item.Title
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [CascadingParameter]
+    public AppState State { get; set; }
+
+    private ViewDefinition _definition;
+
+    [Parameter]
+    public string ViewSlug { get; set; }
+
+    public SearchIssuesResult Results { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if(SiteOptions.Value.Views != null)
+        {
+            _definition = SiteOptions.Value.Views
+                .FirstOrDefault(v => string.Equals(v.Slug, ViewSlug, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if(State != null)
+        {
+            Results = await State.GitHubClient.Search.SearchIssues(new SearchIssuesRequest(_definition.Query));
+        }
+    }
+}

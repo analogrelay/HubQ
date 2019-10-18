@@ -1,0 +1,40 @@
+﻿@page "/signin-github"
+@using Octokit
+@using Microsoft.AspNetCore.WebUtilities
+@inject StateService StateService
+@inject IOptions<GitHubOptions> GitHubOptions
+@inject NavigationManager Navigation
+
+<p>Completing authentication...</p>
+
+@code {
+    [CascadingParameter]
+    public AppState State { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("code", out var code) && query.TryGetValue("state", out var nonce))
+        {
+            if(!string.Equals(nonce, State.OAuthNonce, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("OAuth state validation failed");
+            }
+
+            var accessCode = code.First();
+
+            // create the oauth token request
+            var request = new OauthTokenRequest(GitHubOptions.Value.ClientId, GitHubOptions.Value.ClientSecret, accessCode);
+            // TODO: Need to guard against failed oauth token request
+            var requestToken = await State.GitHubClient.Oauth.CreateAccessToken(request);
+
+            State.GitHubToken = requestToken.AccessToken;
+            State.OAuthNonce = null;
+            await StateService.SaveStateAsync(State);
+
+            Navigation.NavigateTo("/");
+        }
+    }
+}

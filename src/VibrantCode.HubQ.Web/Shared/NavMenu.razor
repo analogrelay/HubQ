@@ -1,27 +1,87 @@
-﻿<div class="top-row pl-4 navbar navbar-dark">
-    <a class="navbar-brand" href="">HubQ</a>
-    <button class="navbar-toggler" @onclick="ToggleNavMenu">
-        <span class="navbar-toggler-icon"></span>
-    </button>
-</div>
+﻿@using System.Security.Cryptography
+@using Microsoft.AspNetCore.WebUtilities
+@inject IOptions<SiteOptions> SiteOptions
+@inject IOptions<GitHubOptions> GitHubOptions
+@inject StateService StateService
+@inject NavigationManager Navigation
 
 <div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
     <ul class="nav flex-column">
-        <li class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="oi oi-home" aria-hidden="true"></span> Home
-            </NavLink>
-        </li>
+        @if (SiteOptions.Value?.Views != null)
+        {
+            foreach (var view in SiteOptions.Value.Views)
+            {
+                var icon = view.Icon ?? "list-rich";
+                var url = $"views/{view.Slug!}";
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="@url" Match="NavLinkMatch.Prefix">
+                        <span class="oi oi-@icon"></span> @(view.Name ?? "NO NAME")
+                    </NavLink>
+                </li>
+            }
+        }
+
+        @if (State != null)
+        {
+            if (State.IsLoggedIn)
+            {
+                <li class="nav-item px-3">
+                    <a class="nav-link" @onclick="LogoutLink_Click" href="#">
+                        <span class="oi oi-account-logout"></span> Logout
+                    </a>
+                </li>
+            }
+            else
+            {
+                <li class="nav-item px-3">
+                    <a class="nav-link" @onclick="LoginLink_Click" href="#">
+                        <span class="oi oi-account-login"></span> Login
+                    </a>
+                </li>
+            }
+        }
     </ul>
 </div>
 
 @code {
+    [CascadingParameter]
+    private AppState State { get; set; }
+
     bool collapseNavMenu = true;
 
-    string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
     void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    async Task LoginLink_Click(MouseEventArgs args)
+    {
+        var nonce = GenerateNonce();
+        State.OAuthNonce = nonce;
+        await StateService.SaveStateAsync(State);
+
+        var request = new Octokit.OauthLoginRequest(GitHubOptions.Value.ClientId)
+        {
+            State = nonce
+        };
+        var url = State.GitHubClient.Oauth.GetGitHubLoginUrl(request);
+
+        Navigation.NavigateTo(url.ToString(), forceLoad: true);
+    }
+
+    async Task LogoutLink_Click(MouseEventArgs args)
+    {
+        State.GitHubToken = null;
+        await StateService.SaveStateAsync(State);
+    }
+
+    string GenerateNonce()
+    {
+        var bytes = new byte[32];
+        var rng = new RNGCryptoServiceProvider();
+        rng.GetBytes(bytes);
+        return WebEncoders.Base64UrlEncode(bytes);
     }
 }

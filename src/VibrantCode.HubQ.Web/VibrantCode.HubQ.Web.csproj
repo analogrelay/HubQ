@@ -5,6 +5,7 @@
     <UserSecretsId>013e6336-60a8-4492-abe0-0799ba4c453d</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="AspNet.Security.OAuth.GitHub" Version="3.0.0-release.19473.83" />
+    <PackageReference Include="Blazored.LocalStorage" Version="2.1.1" />
+    <PackageReference Include="Octokit" Version="0.36.0" />
   </ItemGroup>
 </Project>

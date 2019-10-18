@@ -1,21 +1,23 @@
-﻿@* The AuthorizeView is a second layer of protection. The server shouldn't even render the Blazor unless you're authorized. *@
+﻿@inject StateService State
 
-<CascadingAuthenticationState>
-    <AuthorizeView Policy="@AuthPolicies.IsLoggedIn">
-        <Authorized>
-            <Router AppAssembly="@typeof(Program).Assembly">
-                <Found Context="routeData">
-                    <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
-                </Found>
-                <NotFound>
-                    <LayoutView Layout="@typeof(MainLayout)">
-                        <p>Sorry, there's nothing at this address.</p>
-                    </LayoutView>
-                </NotFound>
-            </Router>
-        </Authorized>
-        <NotAuthorized>
-            Not Authorized! Try refreshing the page.
-        </NotAuthorized>
-    </AuthorizeView>
-</CascadingAuthenticationState>
+<CascadingValue Value="AppState">
+    <Router AppAssembly="@typeof(Program).Assembly">
+        <Found Context="routeData">
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        </Found>
+        <NotFound>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <p>Sorry, there's nothing at this address.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingValue>
+
+@code {
+    public AppState AppState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppState = await State.GetStateAsync();
+    }
+}
