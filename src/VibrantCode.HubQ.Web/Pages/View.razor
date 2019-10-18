@@ -18,15 +18,26 @@ else
     @if (Results == null)
     {
         <p>Loading...</p>
-    } else {
-        <ul>
-            @foreach (var item in Results.Items)
-            {
-                <li>
-                    @item.Number - @item.Title
-                </li>
-            }
-        </ul>
+    } 
+    else
+    {
+        <table class="table table-striped table-sm">
+            <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Title</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Results.Items)
+                {
+                    <tr>
+                        <th scope="row">#@item.Number</th>
+                        <td>@item.Title</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     }
 }
 
