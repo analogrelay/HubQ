@@ -1,0 +1,87 @@
+﻿<div class="container">
+    <div class="row pb-1">
+        <div class="col">
+            <h1>@View.Name</h1>
+        </div>
+
+        <div class="col-sm-auto">
+            @if (_index != null)
+            {
+                <button class="btn btn-primary" @onclick="@SwitchToGridViewButton_Click">
+                    <span class="oi oi-list-rich"></span>
+                    Grid View
+                </button>
+            }
+            else if (Results != null)
+            {
+                <button class="btn btn-primary" @onclick="@SwitchToTriageViewButton_Click">
+                    <span class="oi oi-medical-cross"></span>
+                    Triage View
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="row">
+        @if (Results == null)
+        {
+            <div class="col">
+                <div class="spinner-grow text-primary" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+                <div class="spinner-grow text-secondary" aria-hidden="true" />
+                <div class="spinner-grow text-success" aria-hidden="true" />
+                <div class="spinner-grow text-danger" aria-hidden="true" />
+                <div class="spinner-grow text-warning" aria-hidden="true" />
+                <div class="spinner-grow text-info" aria-hidden="true" />
+                <div class="spinner-grow text-light" aria-hidden="true" />
+                <div class="spinner-grow text-dark" aria-hidden="true" />
+            </div>
+        }
+        else if (_index != null)
+        {
+            var issue = Results.Items[_index];
+            <div class="col">
+                <h2>@issue.Title <span class="triage-issue-number">#@issue.Number</span></h2>
+                <hr />
+                <img src="@issue.User.AvatarUrl" />
+            </div>
+        }
+        else
+        {
+            <div class="col">
+                <IssueGrid Results="Results" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    public AppState State { get; set; }
+
+    [Parameter]
+    public ViewDefinition View { get; set; } = default!;
+
+    public SearchIssuesResult Results { get; set; }
+
+    private int? _index = null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (State != null)
+        {
+            Results = await State.GitHubClient.Search.SearchIssues(new SearchIssuesRequest(View.Query));
+        }
+    }
+
+    private void SwitchToTriageViewButton_Click(MouseEventArgs args)
+    {
+        _index = 0;
+    }
+
+    private void SwitchToGridViewButton_Click(MouseEventArgs args)
+    {
+        _index = null;
+    }
+}

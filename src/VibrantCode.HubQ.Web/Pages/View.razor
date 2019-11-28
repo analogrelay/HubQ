@@ -1,7 +1,5 @@
 ﻿@page "/views/{ViewSlug}"
-@using Octokit
 @inject IOptions<SiteOptions> SiteOptions
-@inject NavigationManager Navigation
 
 @if (_definition == null)
 {
@@ -13,32 +11,7 @@
 }
 else
 {
-    <h3>View</h3>
-
-    @if (Results == null)
-    {
-        <p>Loading...</p>
-    } 
-    else
-    {
-        <table class="table table-striped table-sm">
-            <thead>
-                <tr>
-                    <th scope="col">#</th>
-                    <th scope="col">Title</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var item in Results.Items)
-                {
-                    <tr>
-                        <th scope="row">#@item.Number</th>
-                        <td>@item.Title</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+    <GitHubView View="_definition" />
 }
 
 @code {
@@ -50,19 +23,12 @@ else
     [Parameter]
     public string ViewSlug { get; set; }
 
-    public SearchIssuesResult Results { get; set; }
-
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         if(SiteOptions.Value.Views != null)
         {
             _definition = SiteOptions.Value.Views
                 .FirstOrDefault(v => string.Equals(v.Slug, ViewSlug, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if(State != null)
-        {
-            Results = await State.GitHubClient.Search.SearchIssues(new SearchIssuesRequest(_definition.Query));
         }
     }
 }

@@ -5,8 +5,19 @@
     <UserSecretsId>013e6336-60a8-4492-abe0-0799ba4c453d</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <Content Remove="Data\emoji.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Data\emoji.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="0.17.1" />
     <PackageReference Include="Blazored.LocalStorage" Version="2.1.1" />
+    <PackageReference Include="Humanizer" Version="2.7.9" />
     <PackageReference Include="Octokit" Version="0.36.0" />
     <PackageReference Include="Radzen.Blazor" Version="1.1.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Hubbup.MikLabelModel\Hubbup.MikLabelModel.csproj" />
   </ItemGroup>
 </Project>
